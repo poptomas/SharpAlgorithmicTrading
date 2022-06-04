@@ -5,12 +5,10 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace AlgorithmicTrading {
-    internal class ThreadController {
+    internal struct ThreadController {
         Mutex mutex;
-        bool shallStop;
         public ThreadController() {
             mutex = new Mutex();
-            shallStop = false;
         }
 
         internal bool WaitFor(TimeSpan time) {
@@ -27,7 +25,6 @@ namespace AlgorithmicTrading {
 
         internal void Kill() {
             lock(mutex) {
-                shallStop = true;
                 Monitor.PulseAll(mutex);
             }
         }
