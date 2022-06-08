@@ -10,11 +10,12 @@ namespace AlgorithmicTrading {
         private Dictionary<Options, Command> enumMap;
         private Dictionary<Options, Action> simpleFuncMap;
         private Dictionary<Options, Action<string>> paramFuncMap;
+        private readonly IConnection service;
 
-        public InputProcessor() {
-            slash = '/';
-            delimiter = ' ';
+        public InputProcessor(IConnection inConnection) {
+            service = inConnection;
 
+            // to ensure simple mapping between an enum mapped to a concrete string command and its description
             enumMap = new Dictionary<Options, Command>() {
                 { Options.Help, new Command("help", "prints this help") },
                 { Options.Deposit, new Command("deposit <value>", "adds amount of cash to your account") },
@@ -28,12 +29,12 @@ namespace AlgorithmicTrading {
             };
 
             simpleFuncMap = new Dictionary<Options, Action>() {
-                { Options.Help, ShowInitialHelp },
-                { Options.Transactions, ShowTransactions },
+                { Options.Help, ShowHelp },
                 { Options.Withdraw, Withdraw },
-                { Options.Current, ShowCurrent },
-                { Options.Indicators, ShowIndicators },
-                { Options.Market, ShowMarket },
+                { Options.Transactions, BypassTransactions },
+                { Options.Current, BypassCurrent },
+                { Options.Indicators, BypassIndicators },
+                { Options.Market, BypassMarket },
                 //...
             };
 
@@ -43,6 +44,9 @@ namespace AlgorithmicTrading {
                { Options.Remove, TryRemoveCryptocurrency },
                //...
             };
+
+            slash = '/';
+            delimiter = ' ';
         }
 
         internal string[] Process(string[] arguments) {
@@ -56,18 +60,27 @@ namespace AlgorithmicTrading {
         }
 
         internal void ShowInitialHelp() {
+            Printer.PrintSeparator();
+            ShowHelp();
+            Printer.PrintSeparator();
+        }
+
+        internal void ShowHelp() {
+            Printer.PrintHelpHeader();
+            foreach(var (option, command) in enumMap) {
+                Console.WriteLine(command.GetLine());
+            }
+        }
+
+        internal void BypassTransactions() {
 
         }
 
-        internal void ShowTransactions() {
+        internal void BypassIndicators() {
 
         }
 
-        internal void ShowIndicators() {
-
-        }
-
-        internal void ShowCurrent() {
+        internal void BypassCurrent() {
 
         }
 
@@ -75,7 +88,7 @@ namespace AlgorithmicTrading {
 
         }
 
-        internal void ShowMarket() {
+        internal void BypassMarket() {
 
         }
 
@@ -91,13 +104,33 @@ namespace AlgorithmicTrading {
 
         }
 
-
-        private void ProcessSimpleCommand(string command) {
-            Console.WriteLine("Ten jednoduchej: {0}", command);
+        private void ProcessSimpleCommand(string inCommand) {
+            bool wasFound = false;
+            foreach(var (key, functionCall) in simpleFuncMap) {
+                var command = enumMap[key];
+                if(command.Name == inCommand) {
+                    functionCall();
+                    wasFound = true;
+                    break;
+                }
+            }
+            Printer.PrintCommandsCommon(inCommand, wasFound);
         }
 
         private void ProcessParamCommand(string[] tokens) {
-            Console.WriteLine("Ten s parametrem: {0} -> {1}", tokens[0], tokens[1]);
+            bool wasFound = false;
+            foreach (var (key, functionCall) in paramFuncMap) {
+                var command = enumMap[key];
+                if (command.Name == tokens[0]) {
+                    functionCall(tokens[1]);
+                    wasFound = true;
+                    break;
+                }
+            }
+            Printer.PrintCommandsCommon(
+                string.Join(" ", tokens), 
+                wasFound
+            );
         }
 
         internal void ReadInput(ThreadController c) {
@@ -143,7 +176,7 @@ namespace AlgorithmicTrading {
             return GetFiltered(entries);
         }
 
-        private char slash;
-        private char delimiter;
+        private readonly char slash;
+        private readonly char delimiter;
     }
 }

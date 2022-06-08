@@ -12,7 +12,7 @@
 
         internal void Run(string[] args) {
             IConnection conn = new Connection<Service>();
-            InputProcessor proc = new InputProcessor();
+            InputProcessor proc = new InputProcessor(conn);
             string[] userInput = proc.Process(args);
             conn.ReceiveCurrentData(addToDataset: false);
             conn.PrepareDatasets(userInput);
@@ -23,18 +23,18 @@
         private void RunLoop(IConnection conn, InputProcessor proc) {
             bool addToDataset = false;
             DateTime currentTime = DateTime.Now;
-            ThreadController c = new ThreadController();
-
+            ThreadController controller = new ThreadController();
             ThreadStart cinDelegate = () => {
-                proc.ReadInput(c);
+                proc.ReadInput(controller);
             };
             ThreadStart workerDelegate = () => {
                 conn.ReceiveCurrentData(addToDataset);
             };
             Thread cinThread = new Thread(cinDelegate);
+
             cinThread.Start();
             while (cinThread.IsAlive) {
-                if (c.WaitFor(delay)) {
+                if (controller.WaitFor(delay)) {
                     var workerThread = new Thread(workerDelegate);
                     workerThread.Start();
                     workerThread.Join();
@@ -47,7 +47,7 @@
                     addToDataset = true;
                     currentTime = updatedTime;
                 }
-                c.GiveChance();
+                controller.GiveChance();
             }
             cinThread.Join();
         }

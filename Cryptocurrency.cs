@@ -1,4 +1,4 @@
-enum State { DEFAULT, BUY, SELL, HOLD };
+enum State { Default, Buy, Sell, Hold };
 
 struct Cryptocurrency {
     public State Action {get; set;}

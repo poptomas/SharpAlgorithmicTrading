@@ -9,7 +9,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Diagnostics;
 
-
 namespace AlgorithmicTrading {
 
     using Analyzer = TechnicalIndicatorsAnalyzer;
@@ -71,7 +70,6 @@ namespace AlgorithmicTrading {
             Cryptocurrencies = new Dictionary<string, double>();
         }
 
-
         public async void ReceiveCurrentData(bool addToDataset) {
             Stopwatch sw = new Stopwatch();
             sw.Start();
@@ -110,8 +108,12 @@ namespace AlgorithmicTrading {
         private Uri Endpoint { get; init; }
         private HttpClient Client { get; }
         private JsonSerializerOptions JsonOptions { get; }
-
     }
+
+
+
+
+
 
 
 
