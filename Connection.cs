@@ -83,6 +83,7 @@ namespace AlgorithmicTrading {
                 NumberHandling = JsonNumberHandling.AllowReadingFromString
             };
             Cryptocurrencies = new Dictionary<string, double>();
+            Analyzer = new DataAnalyzer();
         }
 
         public async void ReceiveCurrentData(bool addToDataset) {
@@ -144,9 +145,20 @@ namespace AlgorithmicTrading {
                 // end of the slow part
                 // easier tasks can run in serial
                 // (only 500 records per cryptocurrency symbol)
+                
+                /*
+                var sw = new Stopwatch();
+                sw.Start();
+                /**/
                 for (int index = 0; index < tasks.Length; ++index) {
                     Analyzer.PrepareSymbol(inSymbols[index], tasks[index].Result);
                 }
+                /*
+                sw.Stop();
+                Console.WriteLine("{0} ms", sw.ElapsedMilliseconds);
+                /**/
+                // dbg
+                Analyzer.ShowDataset();
             }
             catch (HttpRequestException exc) {
                 Console.WriteLine(exc.Message);
