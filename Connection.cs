@@ -9,17 +9,23 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Diagnostics;
 
+
 namespace AlgorithmicTrading {
+
+    using Analyzer = TechnicalIndicatorsAnalyzer;
+
     internal interface IConnection {
         public void ReceiveCurrentData(bool addToDataset);
         public void PrepareDatasets(string[] input);
         public Dictionary<string, double> Cryptocurrencies { get; }
+        public Dictionary<string, Cryptocurrency> Watchlist { get; }
     }
 
-    sealed internal class Connection<Service> : IConnection 
+    sealed internal class Connection<Service> : IConnection
         where Service : IConnection, new() {
         public Connection() {
             service = new Service();
+            analyzer = new Analyzer();
         }
 
         public void PrepareDatasets(string[] input) {
@@ -28,19 +34,29 @@ namespace AlgorithmicTrading {
 
         public void ReceiveCurrentData(bool addToDataset) {
             service.ReceiveCurrentData(addToDataset);
+            if(addToDataset) {
+                analyzer.AddToDataset(Watchlist);
+            }
         }
 
-        public Dictionary<string, double> Cryptocurrencies{
+        public Dictionary<string, double> Cryptocurrencies {
             get {
                 return service.Cryptocurrencies;
             }
         }
 
+        public Dictionary<string, Cryptocurrency> Watchlist {
+            get {
+                return service.Watchlist;
+            }
+        }
+
+        private readonly IAnalyzer analyzer;
         private readonly Service service;
     }
 
     sealed internal class BinanceConnection : IConnection {
-        internal class Cryptocurrency {
+        private struct BinanceAPICryptocurrencyInfo {
             public string Symbol { get; init; }
             public double Price { get; init; }
         }
@@ -52,12 +68,9 @@ namespace AlgorithmicTrading {
                 PropertyNameCaseInsensitive = true,
                 NumberHandling = JsonNumberHandling.AllowReadingFromString
             };
-            CryptocurrencyTicker = new Dictionary<string, double>();
+            Cryptocurrencies = new Dictionary<string, double>();
         }
 
-        public Dictionary<string, double> Cryptocurrencies {
-            get { return CryptocurrencyTicker; } 
-        }
 
         public async void ReceiveCurrentData(bool addToDataset) {
             Stopwatch sw = new Stopwatch();
@@ -68,16 +81,20 @@ namespace AlgorithmicTrading {
                 var content = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 Console.WriteLine("Request #{0} - Time: {1}", ++responseCounter, DateTime.Now);
 
-                // binance api - a long list of {"symbol" : "example", "price" : "0.0001"}
-                CryptocurrencyTicker = JsonSerializer
-                    .Deserialize<List<Cryptocurrency>>(content, JsonOptions)
-                    .ToDictionary(v => v.Symbol, v => v.Price);
+                    // binance api - a long list of {"symbol" : "example", "price" : "0.0001"}
+                    Cryptocurrencies = JsonSerializer
+                    .Deserialize<List<BinanceAPICryptocurrencyInfo>>(content, JsonOptions)
+                    .ToDictionary(member => member.Symbol, member => member.Price);
             }
             catch(HttpRequestException ex){
                 Console.WriteLine(ex.Message);
             }
             sw.Stop();
-            Console.WriteLine(CryptocurrencyTicker.Count);
+            foreach (var v in Cryptocurrencies) {
+                if (v.Key.EndsWith("USDT")) {
+                    Console.WriteLine("[{0} : {1}]", v.Key, v.Value);
+                }
+            }
             Console.WriteLine("{0} ms", sw.ElapsedMilliseconds);
         }
 
@@ -85,13 +102,28 @@ namespace AlgorithmicTrading {
 
         }
 
+        public Dictionary<string, double> Cryptocurrencies { get; private set; }
+        public Dictionary<string, Cryptocurrency> Watchlist { get; private set; }
+
         //TODO: delete later - make sure we fit into API limits
         int responseCounter = 0;
         private Uri Endpoint { get; init; }
         private HttpClient Client { get; }
         private JsonSerializerOptions JsonOptions { get; }
-        private Dictionary<string, double> CryptocurrencyTicker { get; set; }
+
     }
+
+
+
+
+
+
+
+
+
+
+
+
 
     sealed internal class DummyConnection : IConnection {
         public void PrepareDatasets(string[] input) {
@@ -102,5 +134,7 @@ namespace AlgorithmicTrading {
             throw new NotImplementedException();
         }
         public Dictionary<string, double> Cryptocurrencies { get; }
+
+        public Dictionary<string, Cryptocurrency> Watchlist { get; }
     }
 }

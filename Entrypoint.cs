@@ -4,12 +4,10 @@
     using Service = BinanceConnection; // CoinbaseConnection, DummyConnection, etc.
 
     internal struct Entrypoint {
-        TimeSpan delay;
-        DateTime currentTime;
+        private readonly TimeSpan delay;
 
         public Entrypoint() {
             delay = TimeSpan.FromSeconds(5);
-            currentTime = DateTime.Now;
         }
 
         internal void Run(string[] args) {
@@ -24,7 +22,9 @@
 
         private void RunLoop(IConnection conn, InputProcessor proc) {
             bool addToDataset = false;
+            DateTime currentTime = DateTime.Now;
             ThreadController c = new ThreadController();
+
             ThreadStart cinDelegate = () => {
                 proc.ReadInput(c);
             };
@@ -32,11 +32,10 @@
                 conn.ReceiveCurrentData(addToDataset);
             };
             Thread cinThread = new Thread(cinDelegate);
-            var workerThread = new Thread(workerDelegate);
             cinThread.Start();
             while (cinThread.IsAlive) {
                 if (c.WaitFor(delay)) {
-                    workerThread = new Thread(workerDelegate);
+                    var workerThread = new Thread(workerDelegate);
                     workerThread.Start();
                     workerThread.Join();
                 }
@@ -44,6 +43,7 @@
                 TimeSpan elapsed = updatedTime - currentTime;
                 addToDataset = false;
                 if (elapsed >= TimeSpan.FromMinutes(1)) {
+                    Console.WriteLine("i am good do not worry mate");
                     addToDataset = true;
                     currentTime = updatedTime;
                 }

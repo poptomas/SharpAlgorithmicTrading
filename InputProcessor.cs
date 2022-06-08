@@ -6,9 +6,43 @@ using System.Threading.Tasks;
 
 namespace AlgorithmicTrading {
     internal class InputProcessor {
+        enum Options { Add, Current, Deposit, Help, Indicators, Market, Remove, Transactions, Withdraw };
+        private Dictionary<Options, Command> enumMap;
+        private Dictionary<Options, Action> simpleFuncMap;
+        private Dictionary<Options, Action<string>> paramFuncMap;
+
         public InputProcessor() {
             slash = '/';
             delimiter = ' ';
+
+            enumMap = new Dictionary<Options, Command>() {
+                { Options.Help, new Command("help", "prints this help") },
+                { Options.Deposit, new Command("deposit <value>", "adds amount of cash to your account") },
+                { Options.Withdraw, new Command("withdraw", "withdraw all your currently possessed cryptocurrencies and end the session") },
+                { Options.Current, new Command("current", "shows the amount of your currently possessed cryptocurrencies including cash currency") },
+                { Options.Transactions, new Command("transactions", "shows your recently accomplished transactions") },
+                { Options.Market, new Command("market", "shows current cryptocurrency market prices from your watchlist") },
+                { Options.Indicators, new Command("indicators", "shows indicators concerning your cryptocurrency watchlist") },
+                { Options.Add, new Command("add <symbol>", "adds a cryptocurrency symbol to your watchlist") },
+                { Options.Remove, new Command("remove <symbol>", "removes a cryptocurrency symbol from your watchlist") }
+            };
+
+            simpleFuncMap = new Dictionary<Options, Action>() {
+                { Options.Help, ShowInitialHelp },
+                { Options.Transactions, ShowTransactions },
+                { Options.Withdraw, Withdraw },
+                { Options.Current, ShowCurrent },
+                { Options.Indicators, ShowIndicators },
+                { Options.Market, ShowMarket },
+                //...
+            };
+
+            paramFuncMap = new Dictionary<Options, Action<string>>() {
+               { Options.Deposit, TryDepositCash },
+               { Options.Add, TryAddCryptocurrency },
+               { Options.Remove, TryRemoveCryptocurrency },
+               //...
+            };
         }
 
         internal string[] Process(string[] arguments) {
@@ -25,12 +59,45 @@ namespace AlgorithmicTrading {
 
         }
 
+        internal void ShowTransactions() {
+
+        }
+
+        internal void ShowIndicators() {
+
+        }
+
+        internal void ShowCurrent() {
+
+        }
+
+        internal void Withdraw() {
+
+        }
+
+        internal void ShowMarket() {
+
+        }
+
+        internal void TryDepositCash(string amount) {
+
+        }
+
+        internal void TryAddCryptocurrency(string inCryptocurrency) {
+
+        }
+
+        internal void TryRemoveCryptocurrency(string inCryptocurrency) {
+
+        }
+
+
         private void ProcessSimpleCommand(string command) {
-            Console.WriteLine(command);
+            Console.WriteLine("Ten jednoduchej: {0}", command);
         }
 
         private void ProcessParamCommand(string[] tokens) {
-            Console.WriteLine("{0}: {1}", tokens[0], tokens[1]);
+            Console.WriteLine("Ten s parametrem: {0} -> {1}", tokens[0], tokens[1]);
         }
 
         internal void ReadInput(ThreadController c) {
