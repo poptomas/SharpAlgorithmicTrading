@@ -136,7 +136,7 @@ namespace AlgorithmicTrading {
         internal void ReadInput(ThreadController c) {
             while(true) {
                 var line = Console.ReadLine();
-                if(line == null) {
+                if (line == null) {
                     continue;
                 }
                 var lower = line.ToLower();

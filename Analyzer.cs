@@ -6,16 +6,24 @@ using System.Threading.Tasks;
 
 namespace AlgorithmicTrading {
     internal interface IAnalyzer {
-        virtual void AddToDataset(Dictionary<string, Cryptocurrency> currentWatchlist) {
-            
+        public void AddToDataset(Dictionary<string, Cryptocurrency> currentWatchlist);
+        public void RemoveFromDataset(Dictionary<string, Cryptocurrency> currentWatchlist);
+    }
+
+    internal struct TechnicalIndicatorsAnalyzer : IAnalyzer {
+        public void AddToDataset(Dictionary<string, Cryptocurrency> currentWatchlist) {
+            throw new NotImplementedException();
         }
-    }
 
-    internal class DummyAnalyzer : IAnalyzer {
-    
-    }
+        public void RemoveFromDataset(Dictionary<string, Cryptocurrency> currentWatchlist) {
+            throw new NotImplementedException();
+        }
 
-    internal class TechnicalIndicatorsAnalyzer : IAnalyzer {
-
+        internal void PrepareSymbol(string symbol, List<double> result) {
+            Console.WriteLine("Cryptocurrency: {0}", symbol);
+            foreach(var v in result) {
+                Console.Write("{0} ", v);
+            }
+        }
     }
 }
