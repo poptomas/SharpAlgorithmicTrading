@@ -9,16 +9,18 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Diagnostics;
 
+
+
 namespace AlgorithmicTrading {
+    using TaskList = List<Task<List<double>>>;
 
-    using DataAnalyzer = TechnicalIndicatorsAnalyzer;
-
-    internal interface IConnection {
-        public void ReceiveCurrentData(bool addToDataset);
+    interface IConnection {
+        public void ReceiveCurrentData();
         public void PrepareDatasets(string[] input);
         public Dictionary<string, double> Cryptocurrencies { get; }
         public Dictionary<string, Cryptocurrency> Watchlist { get; }
         public DataAnalyzer Analyzer { get; }
+        public ServiceNumerics Numerics { get; }
     }
 
     sealed internal class Connection<Service> : IConnection
@@ -27,17 +29,19 @@ namespace AlgorithmicTrading {
             service = new Service();
         }
 
-
-
         public void PrepareDatasets(string[] input) {
             service.PrepareDatasets(input);
         }
 
-        public void ReceiveCurrentData(bool addToDataset) {
-            service.ReceiveCurrentData(addToDataset);
-            if(addToDataset) {
-                Analyzer.AddToDataset(Watchlist);
-            }
+        public void UpdateDataset() {
+            Analyzer.ProcessData(
+                data: Watchlist,
+                shallAddRow: true
+            );
+        }
+
+        public void ReceiveCurrentData() {
+            service.ReceiveCurrentData();
         }
 
         public Dictionary<string, double> Cryptocurrencies {
@@ -52,13 +56,70 @@ namespace AlgorithmicTrading {
             }
         }
 
-        public DataAnalyzer Analyzer {
+        DataAnalyzer IConnection.Analyzer {
             get {
                 return service.Analyzer;
             }
         }
 
+        private DataAnalyzer Analyzer {
+            get {
+                return service.Analyzer;
+            }
+        }
+
+        public ServiceNumerics Numerics {
+            get {
+                return service.Numerics;
+            }
+        }
+
         private readonly Service service;
+
+        internal void TryRemove(string inCryptocurrency) {
+            if(Watchlist.ContainsKey(inCryptocurrency)) {
+                Analyzer.Remove(inCryptocurrency);
+                Watchlist.Remove(inCryptocurrency);
+            }
+        }
+
+        internal void TryAdd(string inCryptocurrency) {
+            if (Cryptocurrencies.ContainsKey(inCryptocurrency) 
+            && !Watchlist.ContainsKey(inCryptocurrency)) {
+                var cryptocurrencyAction = new Cryptocurrency(
+                    inAction: State.Default,
+                    inPrice: Cryptocurrencies[inCryptocurrency]
+                );
+                Watchlist[inCryptocurrency] = cryptocurrencyAction;
+            }
+            else {
+                Console.WriteLine("Already in the list/invalid cryptocurrency");
+            }
+        }
+
+        internal void TryDeposit(double total) {
+            throw new NotImplementedException();
+        }
+
+        internal void DisplayMarket() {
+            foreach (var (name, info) in Watchlist) {
+                Console.WriteLine("[{0}: {1}]", name, info.Price);
+            }
+        }
+
+        internal void DisplayIndicators() {
+            throw new NotImplementedException();
+        }
+
+        internal void DisplayCurrent() {
+            foreach(var (name, info) in Watchlist) {
+                Console.WriteLine("[{0}: {1}]", name, info.Price);
+            }
+        }
+
+        internal void DisplayTransactions() {
+            throw new NotImplementedException();
+        }
     }
 
     sealed internal class BinanceConnection : IConnection {
@@ -84,9 +145,16 @@ namespace AlgorithmicTrading {
             };
             Cryptocurrencies = new Dictionary<string, double>();
             Analyzer = new DataAnalyzer();
+            Numerics = new ServiceNumerics(
+                inTradingFee: 0.001,
+                inWithdrawalFee: 0.01,
+                inMinDeposit: 15
+            );
+            Watchlist = new Dictionary<string, Cryptocurrency>();
         }
 
-        public async void ReceiveCurrentData(bool addToDataset) {
+
+        public async void ReceiveCurrentData() {
             /*
             Stopwatch sw = new Stopwatch();
             sw.Start();
@@ -102,10 +170,19 @@ namespace AlgorithmicTrading {
                 Cryptocurrencies = JsonSerializer
                     .Deserialize<List<BinanceAPICryptocurrencyInfo>>(content, JsonOptions)
                     .ToDictionary(member => member.Symbol, member => member.Price);
+
+                foreach(var (symbol, info) in Watchlist) {
+                    Watchlist[symbol] = new Cryptocurrency(info.Action, Cryptocurrencies[symbol]);
+                }
             }
             catch(HttpRequestException exc){
                 Console.WriteLine(exc.Message);
             }
+            Analyzer.ProcessData(
+                data: Watchlist, 
+                shallAddRow: false
+            );
+
             /*
             sw.Stop();
             foreach (var v in Cryptocurrencies) {
@@ -133,26 +210,50 @@ namespace AlgorithmicTrading {
             return result;
         }
 
+        private void AddNewCryptocurrency(string symbol) {
+            var cryptocurrency = new Cryptocurrency(
+                inAction: State.Default,
+                inPrice: Cryptocurrencies[symbol]
+            );
+            Watchlist[symbol] = cryptocurrency;
+        }
+
+        private IEnumerable<string> FilterSetPreferences(string[] inSymbols) {
+            foreach(var symbol in inSymbols) {
+                if (Cryptocurrencies.ContainsKey(symbol)) {
+                    AddNewCryptocurrency(symbol);
+                    // give the opportunity process on the go
+                    yield return symbol;
+                }
+                else {
+                    Console.WriteLine($"{symbol} unavailable...");
+                }
+            }
+        }
+
         public async void PrepareDatasets(string[] inSymbols) {
+            var filteredSymbols = FilterSetPreferences(inSymbols);
             try {
-                int length = inSymbols.Length;
                 // slow part
-                var tasks = new Task<List<double>>[inSymbols.Length];
-                for (int index = 0; index < length; ++index) {
-                    tasks[index] = ReceiveDataset(inSymbols[index]);
+                TaskList tasks = new TaskList();
+                foreach(var symbol in filteredSymbols) {
+                    tasks.Add(Task.Run(() => ReceiveDataset(symbol)));
                 }
                 await Task.WhenAll(tasks);
                 // end of the slow part
                 // easier tasks can run in serial
                 // (only 500 records per cryptocurrency symbol)
-                
+
                 /*
                 var sw = new Stopwatch();
                 sw.Start();
                 /**/
-                for (int index = 0; index < tasks.Length; ++index) {
-                    Analyzer.PrepareSymbol(inSymbols[index], tasks[index].Result);
+
+                var zipped = filteredSymbols.Zip(tasks);
+                foreach (var (symbol, task) in zipped) {
+                    Analyzer.PrepareSymbol(symbol, task.Result);
                 }
+
                 /*
                 sw.Stop();
                 Console.WriteLine("{0} ms", sw.ElapsedMilliseconds);
@@ -167,26 +268,32 @@ namespace AlgorithmicTrading {
 
         public Dictionary<string, double> Cryptocurrencies { get; private set; }
         public Dictionary<string, Cryptocurrency> Watchlist { get; private set; }
-        public DataAnalyzer Analyzer { get; }
+        public DataAnalyzer Analyzer { get; init; }
 
         //TODO: delete later - make sure we fit into API limits
         int responseCounter = 0;
         private string BaseUrl { get; }
         private HttpClient Client { get; }
         private JsonSerializerOptions JsonOptions { get; }
+        public ServiceNumerics Numerics { get; }
     }
 
     sealed internal class DummyConnection : IConnection {
+        public DummyConnection() {
+            // optionally if needed - initialize service connected numerics
+            // trading fee, withdrawal fee, minimum deposit
+        }
+
         public void PrepareDatasets(string[] input) {
             throw new NotImplementedException();
         }
 
-        public void ReceiveCurrentData(bool addToDataset) {
+        public void ReceiveCurrentData() {
             throw new NotImplementedException();
         }
         public Dictionary<string, double> Cryptocurrencies { get; }
-
         public Dictionary<string, Cryptocurrency> Watchlist { get; }
-        public DataAnalyzer Analyzer { get; init; }
+        public DataAnalyzer Analyzer { get; }
+        public ServiceNumerics Numerics { get; }
     }
 }
