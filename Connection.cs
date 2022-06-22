@@ -91,34 +91,37 @@ namespace AlgorithmicTrading {
                     inPrice: Cryptocurrencies[inCryptocurrency]
                 );
                 Watchlist[inCryptocurrency] = cryptocurrencyAction;
+                Analyzer.AddToDataset(inCryptocurrency);
             }
             else {
                 Console.WriteLine("Already in the list/invalid cryptocurrency");
             }
         }
 
-        internal void TryDeposit(double total) {
-            throw new NotImplementedException();
-        }
-
-        internal void DisplayMarket() {
-            foreach (var (name, info) in Watchlist) {
-                Console.WriteLine("[{0}: {1}]", name, info.Price);
+        internal void TryDeposit(double inDepositValue) {
+            if(inDepositValue < Numerics.MinimumDeposit) {
+                Console.WriteLine($"add at least {Numerics.MinimumDeposit}");
+            }
+            else {
+                Analyzer.Deposit(inDepositValue);
             }
         }
 
-        internal void DisplayIndicators() {
-            throw new NotImplementedException();
+        internal void CallMarket() {
+            // accessible from connection
+            Watchlist.Print();
         }
 
-        internal void DisplayCurrent() {
-            foreach(var (name, info) in Watchlist) {
-                Console.WriteLine("[{0}: {1}]", name, info.Price);
-            }
+        internal void CallIndicators() {
+            Analyzer.ShowIndicators();
         }
 
-        internal void DisplayTransactions() {
-            throw new NotImplementedException();
+        internal void CallAssets() {
+            Analyzer.ShowAssets();
+        }
+
+        internal void CallTransactions() {
+            Analyzer.ShowTransactions();
         }
     }
 
@@ -144,38 +147,40 @@ namespace AlgorithmicTrading {
                 NumberHandling = JsonNumberHandling.AllowReadingFromString
             };
             Cryptocurrencies = new Dictionary<string, double>();
-            Analyzer = new DataAnalyzer();
             Numerics = new ServiceNumerics(
                 inTradingFee: 0.001,
+                inDepositFee: 0.01,
                 inWithdrawalFee: 0.01,
                 inMinDeposit: 15
             );
+            Analyzer = new DataAnalyzer(Numerics);
             Watchlist = new Dictionary<string, Cryptocurrency>();
         }
 
 
-        public async void ReceiveCurrentData() {
+        public void ReceiveCurrentData() {
             /*
             Stopwatch sw = new Stopwatch();
             sw.Start();
             /**/
             try {
                 string endpoint = GetCurrentDataEndpoint();
-                var response = await Client.GetAsync(endpoint).ConfigureAwait(false);
+                var response = Client.GetAsync(endpoint).ConfigureAwait(false).GetAwaiter().GetResult();
                 response.EnsureSuccessStatusCode();
-                var content = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                var content = response.Content.ReadAsStringAsync().ConfigureAwait(false).GetAwaiter().GetResult();
                 Console.WriteLine("Request #{0} - Time: {1}", ++responseCounter, DateTime.Now);
 
-                    // binance api - a long list of {"symbol" : "example", "price" : "0.0001"}
+                // binance api - a long list of {"symbol" : "example", "price" : "0.0001"}
                 Cryptocurrencies = JsonSerializer
                     .Deserialize<List<BinanceAPICryptocurrencyInfo>>(content, JsonOptions)
                     .ToDictionary(member => member.Symbol, member => member.Price);
 
-                foreach(var (symbol, info) in Watchlist) {
+                foreach (var (symbol, info) in Watchlist) {
                     Watchlist[symbol] = new Cryptocurrency(info.Action, Cryptocurrencies[symbol]);
                 }
             }
-            catch(HttpRequestException exc){
+
+            catch (HttpRequestException exc) {
                 Console.WriteLine(exc.Message);
             }
             Analyzer.ProcessData(
@@ -216,30 +221,40 @@ namespace AlgorithmicTrading {
                 inPrice: Cryptocurrencies[symbol]
             );
             Watchlist[symbol] = cryptocurrency;
+
         }
 
         private IEnumerable<string> FilterSetPreferences(string[] inSymbols) {
             foreach(var symbol in inSymbols) {
-                if (Cryptocurrencies.ContainsKey(symbol)) {
+                if (Cryptocurrencies.ContainsKey(symbol) 
+                && !Watchlist.ContainsKey(symbol)) {
                     AddNewCryptocurrency(symbol);
                     // give the opportunity process on the go
                     yield return symbol;
                 }
                 else {
-                    Console.WriteLine($"{symbol} unavailable...");
+                    Console.WriteLine("{0} is not available", symbol);
                 }
             }
         }
 
-        public async void PrepareDatasets(string[] inSymbols) {
-            var filteredSymbols = FilterSetPreferences(inSymbols);
+        public void PrepareDatasets(string[] inSymbols) {
             try {
-                // slow part
-                TaskList tasks = new TaskList();
-                foreach(var symbol in filteredSymbols) {
-                    tasks.Add(Task.Run(() => ReceiveDataset(symbol)));
-                }
-                await Task.WhenAll(tasks);
+                var sw = new Stopwatch();
+                sw.Start();
+                var filteredSymbols = FilterSetPreferences(inSymbols);
+                var query = filteredSymbols.AsParallel().Select(symbol => {
+                    return (
+                        Symbol: symbol, 
+                        Dataset: ReceiveDataset(symbol)
+                     );
+                });
+                query.ForAll(part => {
+                    Analyzer.PrepareSymbol(part.Symbol, part.Dataset.Result);
+                });
+                sw.Stop();
+                Console.WriteLine("{0} ms", sw.ElapsedMilliseconds);
+
                 // end of the slow part
                 // easier tasks can run in serial
                 // (only 500 records per cryptocurrency symbol)
@@ -248,11 +263,6 @@ namespace AlgorithmicTrading {
                 var sw = new Stopwatch();
                 sw.Start();
                 /**/
-
-                var zipped = filteredSymbols.Zip(tasks);
-                foreach (var (symbol, task) in zipped) {
-                    Analyzer.PrepareSymbol(symbol, task.Result);
-                }
 
                 /*
                 sw.Stop();
