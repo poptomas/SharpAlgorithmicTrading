@@ -2,7 +2,11 @@
 
     static class IEnumerableExtensions {
         public static IEnumerable<double> GetDifferences(this IEnumerable<double> storage) {
-            return storage.Zip(storage.Skip(1), (first, second) => { return second - first; });
+            return storage.Zip(
+                storage.Skip(1), (first, second) => { 
+                    return second - first; 
+                }
+            );
         }
     }
 
@@ -15,6 +19,14 @@
     static class StringExtensions {
         public static string Filter(this string input, char removedCharacter) {
             return input.Replace(removedCharacter, '\0');
+        }
+    }
+
+    static class WatchlistExtensions {
+        public static void Print(this Dictionary<string, Cryptocurrency> watchList) {
+            foreach (var (name, cryptocurrency) in watchList) {
+                Console.WriteLine("[{0}: {1}]", name, cryptocurrency.Price);
+            }
         }
     }
 }
