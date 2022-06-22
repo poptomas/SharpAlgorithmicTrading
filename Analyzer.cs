@@ -11,10 +11,11 @@ namespace AlgorithmicTrading {
     internal interface IAnalyzer {
         public void AddToDataset(string inCryptocurrency);
         public void RemoveFromDataset(string inCryptocurrency);
+        public Dictionary<string, double> Assets { get; }
     }
 
-    public struct TechnicalIndicatorsAnalyzer : IAnalyzer {
-
+    internal struct TechnicalIndicatorsAnalyzer : IAnalyzer {
+        private readonly string currency;
         private byte rsiPeriod = 13; // +1 (the latest received value via API)
         private byte bbPeriod = 20;  // ...
         private DataMap dataset;
@@ -24,30 +25,32 @@ namespace AlgorithmicTrading {
 
         // sorted for the convenience
         private SortedDictionary<string, List<double>> lastRecords;
+        public ServiceNumerics Numerics { get; init; }
 
-        public TechnicalIndicatorsAnalyzer() {
+        public Dictionary<string, double> Assets { get; private set; }
+
+        public TechnicalIndicatorsAnalyzer(ServiceNumerics inNumerics) {
             dataset = new DataMap();
             lastRecords = new SortedDictionary<string, List<double>>();
-
             // indicators
             bb = new BollingerBands();
             rsi = new RelativeStrengthIndex();
+            currency = "USD";
+            Assets = new Dictionary<string, double>() { { currency, 0 } };
+            Numerics = inNumerics;
         }
 
         public void AddToDataset(string inCryptocurrency) {
-            throw new NotImplementedException();
+            
         }
 
         public void RemoveFromDataset(string inCryptocurrency) {
             throw new NotImplementedException();
         }
 
-        private double ComputeBB(string symbol, double price) {
-            return 654321;
-        }
+        public void Deposit(double depositValue) {
+            double afterFee = depositValue - depositValue * Numerics.DepositFee;
 
-        private double ComputeRSI(string symbol, double price) {
-            return 123456;
         }
 
         internal void PrepareSymbol(string symbol, List<double> previousPrices) {
@@ -55,43 +58,65 @@ namespace AlgorithmicTrading {
             dataset.Add(symbol, new Matrix());
             foreach (double price in previousPrices) {
                 List<double> rowCells = new List<double>();
-                if(iteration > rsiPeriod) {
-                    double rsi = ComputeRSI(symbol, price);
-                    rowCells.Add(rsi);
+                if(iteration > rsi.LookBackPeriod) {
+                    double v = rsi.GetIndicatorValue(dataset[symbol], price);
+                    rowCells.Add(v);
                 }
                 else {
                     rowCells.Add(0);
                 }
 
-                if(iteration > bbPeriod) {
-                    double bollingerBands = ComputeBB(symbol, price);
-                    rowCells.Add(bollingerBands);
+                if(iteration > bb.LookBackPeriod) {
+                    var (lowerBand, upperBand) = bb.GetBands(dataset[symbol], price);
+                    rowCells.Add(lowerBand); 
+                    rowCells.Add(upperBand);
                 }
                 else {
                     rowCells.Add(0);
                     rowCells.Add(0);
                 }
 
-                if (dataset[symbol].Count > bbPeriod) { // the max constant for the technical indicators lookback
+                // the max constant for the technical indicators lookback
+                if (dataset[symbol].Count > bbPeriod) { 
                     dataset[symbol].Dequeue();
                 }
 
                 rowCells.Add(price);
                 dataset[symbol].Enqueue(rowCells);
+                ++iteration;
             }
         }
 
         private List<double> GetNextRow(string symbol, double price) {
-            List<double> rowCells = new List<double>();
 
             var rsiValue = rsi.GetIndicatorValue(dataset[symbol], price);
-            var(lowerBand, upperBand) = bb.GetBands(dataset[symbol], price);
+            var (lowerBand, upperBand) = bb.GetBands(dataset[symbol], price);
 
+            List<double> rowCells = new List<double>() { 
+                rsiValue, lowerBand, upperBand, price 
+            };
+            lastRecords[symbol] = rowCells;
             return rowCells;
         }
 
-        private void DecideSignal(string symbol, List<double> newRow) {
+        internal void ShowAssets() {
+            Console.WriteLine("Assets:");
+            foreach (var (v, w) in Assets) {
+                Console.WriteLine($"{v}: {w}");
+            }
+        }
 
+        internal void ShowIndicators() {
+            Console.WriteLine("Indicators");
+            
+            foreach (var(symbol, indicators) in lastRecords) {
+                Console.WriteLine("{0}: RSI: {1:0.#####} Lower: {2:0.#####} Upper: {3:0.#####} Price: {4:0.#####}",
+                symbol, indicators[0], indicators[1], indicators[2], indicators[3]);
+            }
+        }
+
+        private void DecideSignal(string symbol, List<double> newRow) {
+            Console.WriteLine("Buy of course xd");
         }
 
         internal void ProcessData(Dictionary<string, Cryptocurrency> data, bool shallAddRow) {
@@ -116,8 +141,15 @@ namespace AlgorithmicTrading {
             }
         }
 
-        public void Remove(string cryptocurrencyName) {
-            throw new NotImplementedException();
+        public void Remove(string symbol) {
+            if (Assets[symbol] > 0) {
+                double lastPrice = lastRecords[symbol].Last();
+                // force sell
+            }
+            dataset.Remove(symbol);
+            Assets.Remove(symbol);
+            lastRecords.Remove(symbol);
+
         }
 
         interface Indicator {
@@ -127,10 +159,30 @@ namespace AlgorithmicTrading {
         private struct BollingerBands : Indicator {
             public int LookBackPeriod { get; init; }
             public BollingerBands() {
-                LookBackPeriod = 20;
+                LookBackPeriod = 21;
             }
+
+            private double GetStandardDeviation(List<double> prices, double mean) {
+                double variance = 0;
+                foreach(var val in prices) {
+                    variance = variance + (val - mean) * (val - mean);
+                }
+                variance = Math.Sqrt(variance / prices.Count);
+                return variance;
+            }
+
             public (double, double) GetBands(Matrix inMatrix, double price) {
-                return (1.0, 2.0);
+                List<double> prices = new List<double>();
+                var lastValues = inMatrix.TakeLast(LookBackPeriod);
+                foreach (var val in lastValues) {
+                    prices.Add(val.Last());
+                }
+                prices.Add(price);
+                double mean = prices.Average();
+                double stdDeviation = GetStandardDeviation(prices, mean);
+                double lowerBand = mean - 2 * stdDeviation;
+                double upperBand = mean + 2 * stdDeviation;
+                return (lowerBand, upperBand);
             }
         }
 
@@ -148,7 +200,7 @@ namespace AlgorithmicTrading {
                 List<double> prices = new List<double>();
                 var lastValues = inMatrix.TakeLast(LookBackPeriod);
                 foreach(var val in lastValues) {
-                    prices.Add(val[val.Count - 1]);
+                    prices.Add(val.Last());
                 }
                 // latest
                 prices.Add(price);
