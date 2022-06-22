@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 
 namespace AlgorithmicTrading {
     internal struct ThreadController {
-        Mutex mutex;
+        object mutex;
         public ThreadController() {
-            mutex = new Mutex();
+            mutex = new object();
         }
 
         internal bool WaitFor(TimeSpan time) {
@@ -17,14 +17,15 @@ namespace AlgorithmicTrading {
             }
         }
 
-        internal void GiveChance() {
+        internal void Release() {
             lock(mutex) {
                 Monitor.Pulse(mutex);
             }
         }
 
-        internal void Kill() {
+        internal void ReleaseAll() {
             lock(mutex) {
+
                 Monitor.PulseAll(mutex);
             }
         }
