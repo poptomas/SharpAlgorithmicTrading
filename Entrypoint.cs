@@ -10,13 +10,13 @@ namespace AlgorithmicTrading {
         private readonly TimeSpan delay;
 
         public Entrypoint() {
-            delay = TimeSpan.FromSeconds(1);
+            delay = TimeSpan.FromSeconds(10);
         }
 
-        internal void Run(string[] args) {
+        internal void Run() {
             var conn = new Connection<Service>();
             InputProcessor proc = new InputProcessor(conn);
-            string[] userInput = proc.Process(args);
+            string[] userInput = proc.Process();
             conn.ReceiveCurrentData();
             conn.PrepareDatasets(userInput);
             proc.ShowInitialHelp();
@@ -42,6 +42,7 @@ namespace AlgorithmicTrading {
                 if (elapsed >= TimeSpan.FromMinutes(1)) {
                     // get the latest info possible before update
                     conn.UpdateDataset();
+                    Console.WriteLine("Dataset update zzz....");
                     currentTime = updatedTime;
                 }
             }
@@ -51,7 +52,7 @@ namespace AlgorithmicTrading {
     internal class Program {
         static void Main(string[] args) {
             var entrypoint = new Entrypoint();
-            entrypoint.Run(args);
+            entrypoint.Run();
         }
     }
 }
