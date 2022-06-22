@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace AlgorithmicTrading {
     internal class InputProcessor {
-        enum Options { Add, Current, Deposit, Help, Indicators, Market, Remove, Transactions, Withdraw };
+        enum Options { Add, Assets, Deposit, Help, Indicators, Market, Remove, Transactions, Withdraw };
         private Dictionary<Options, Command> enumMap;
         private Dictionary<Options, Action> simpleFuncMap;
         private Dictionary<Options, Action<string>> paramFuncMap;
@@ -20,7 +20,7 @@ namespace AlgorithmicTrading {
                 { Options.Help, new Command("help", "prints this help") },
                 { Options.Deposit, new Command("deposit <value>", "adds amount of cash to your account") },
                 { Options.Withdraw, new Command("withdraw", "withdraw all your currently possessed cryptocurrencies and end the session") },
-                { Options.Current, new Command("current", "shows the amount of your currently possessed cryptocurrencies including cash currency") },
+                { Options.Assets, new Command("assets", "shows the amount of your currently possessed cryptocurrencies including cash currency") },
                 { Options.Transactions, new Command("transactions", "shows your recently accomplished transactions") },
                 { Options.Market, new Command("market", "shows current cryptocurrency market prices from your watchlist") },
                 { Options.Indicators, new Command("indicators", "shows indicators concerning your cryptocurrency watchlist") },
@@ -31,10 +31,10 @@ namespace AlgorithmicTrading {
             simpleFuncMap = new Dictionary<Options, Action>() {
                 { Options.Help, ShowHelp },
                 { Options.Withdraw, Withdraw },
-                { Options.Transactions, BypassTransactions },
-                { Options.Current, BypassCurrent },
-                { Options.Indicators, BypassIndicators },
-                { Options.Market, BypassMarket },
+                { Options.Transactions, CallTransactions },
+                { Options.Assets, CallAsssets },
+                { Options.Indicators, CallIndicators },
+                { Options.Market, CallMarket },
                 //...
             };
 
@@ -49,14 +49,9 @@ namespace AlgorithmicTrading {
             delimiter = ' ';
         }
 
-        internal string[] Process(string[] arguments) {
-            if (arguments.IsEmpty()) {
-                Printer.PrintHeader();
-                return ProcessCinArguments();
-            }
-            else {
-                return ProcessCmdlineArguments(arguments);
-            }
+        internal string[] Process() {
+            Printer.PrintHeader();
+            return ProcessCinArguments();
         }
 
         internal void ShowInitialHelp() {
@@ -72,24 +67,23 @@ namespace AlgorithmicTrading {
             }
         }
 
-        internal void BypassTransactions() {
+        internal void CallTransactions() {
             Console.WriteLine("Transactions done.");
-            service.DisplayTransactions();
+            service.CallTransactions();
         }
 
-        internal void BypassIndicators() {
-            Console.WriteLine("Indicators done.");
-            service.DisplayIndicators();
+        internal void CallIndicators() {
+            service.CallIndicators();
         }
 
-        internal void BypassCurrent() {
-            Console.WriteLine("Current done.");
-            service.DisplayCurrent();
+        internal void CallAsssets() {
+            Console.WriteLine("Assets done.");
+            service.CallAssets();
         }
 
-        internal void BypassMarket() {
+        internal void CallMarket() {
             Console.WriteLine("Market done.");
-            service.DisplayMarket();
+            service.CallMarket();
         }
 
         internal void Withdraw() {
@@ -174,10 +168,6 @@ namespace AlgorithmicTrading {
                 inStorage[idx] = inStorage[idx].Filter(slash).ToUpper();
             }
             return inStorage;
-        }
-
-        private string[] ProcessCmdlineArguments(string[] arguments) {
-            return GetFiltered(arguments);
         }
 
         private string[] ProcessCinArguments() {
