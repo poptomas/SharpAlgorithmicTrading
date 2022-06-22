@@ -99,6 +99,10 @@ namespace AlgorithmicTrading {
             return rowCells;
         }
 
+        internal void ShowTransactions() {
+            throw new NotImplementedException();
+        }
+
         internal void ShowAssets() {
             Console.WriteLine("Assets:");
             foreach (var (v, w) in Assets) {
