@@ -10,9 +10,9 @@ namespace AlgorithmicTrading {
         private Dictionary<Options, Command> enumMap;
         private Dictionary<Options, Action> simpleFuncMap;
         private Dictionary<Options, Action<string>> paramFuncMap;
-        private readonly IConnection service;
+        private readonly Connection<Service> service;
 
-        public InputProcessor(IConnection inConnection) {
+        public InputProcessor(Connection<Service> inConnection) {
             service = inConnection;
 
             // to ensure simple mapping between an enum mapped to a concrete string command and its description
@@ -73,35 +73,44 @@ namespace AlgorithmicTrading {
         }
 
         internal void BypassTransactions() {
-
+            Console.WriteLine("Transactions done.");
+            service.DisplayTransactions();
         }
 
         internal void BypassIndicators() {
-
+            Console.WriteLine("Indicators done.");
+            service.DisplayIndicators();
         }
 
         internal void BypassCurrent() {
-
-        }
-
-        internal void Withdraw() {
-
+            Console.WriteLine("Current done.");
+            service.DisplayCurrent();
         }
 
         internal void BypassMarket() {
+            Console.WriteLine("Market done.");
+            service.DisplayMarket();
+        }
 
+        internal void Withdraw() {
+            Console.WriteLine("Withdraw done.");
         }
 
         internal void TryDepositCash(string amount) {
-
+            if(double.TryParse(amount, out double total) && total > 0) {
+                service.TryDeposit(total);
+            }
+            else {
+                Console.WriteLine("Problem.");
+            }
         }
 
         internal void TryAddCryptocurrency(string inCryptocurrency) {
-
+            service.TryAdd(inCryptocurrency);
         }
 
         internal void TryRemoveCryptocurrency(string inCryptocurrency) {
-
+            service.TryRemove(inCryptocurrency);
         }
 
         private void ProcessSimpleCommand(string inCommand) {
@@ -133,17 +142,18 @@ namespace AlgorithmicTrading {
             );
         }
 
-        internal void ReadInput(ThreadController c) {
-            while(true) {
+        internal void ReadInput(ThreadController controller) {
+            while (true) {
                 var line = Console.ReadLine();
                 if (line == null) {
                     continue;
                 }
                 var lower = line.ToLower();
                 var tokens = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                if(tokens.Length == 1 && lower == "quit") {
+                if(tokens.Length == 1 
+                && lower == enumMap[Options.Withdraw].Name) {
                     ProcessSimpleCommand(lower);
-                    c.Kill();
+                    controller.ReleaseAll();
                     break;
                 }
                 else if(tokens.Length == 1) {
