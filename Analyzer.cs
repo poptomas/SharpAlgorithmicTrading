@@ -9,15 +9,11 @@ namespace AlgorithmicTrading {
     using DataMap = Dictionary<string, Queue<List<double>>>;
 
     internal interface IAnalyzer {
-        public void AddToDataset(string inCryptocurrency);
-        public void RemoveFromDataset(string inCryptocurrency);
         public Dictionary<string, double> Assets { get; }
     }
 
     internal struct TechnicalIndicatorsAnalyzer : IAnalyzer {
         private readonly string currency;
-        private byte rsiPeriod = 13; // +1 (the latest received value via API)
-        private byte bbPeriod = 20;  // ...
         private DataMap dataset;
 
         private readonly BollingerBands bb;
@@ -40,35 +36,27 @@ namespace AlgorithmicTrading {
             Numerics = inNumerics;
         }
 
-        public void AddToDataset(string inCryptocurrency) {
-            
-        }
-
-        public void RemoveFromDataset(string inCryptocurrency) {
-            throw new NotImplementedException();
-        }
-
         public void Deposit(double depositValue) {
             double afterFee = depositValue - depositValue * Numerics.DepositFee;
-
+            Assets[currency] += afterFee;
         }
 
-        internal void PrepareSymbol(string symbol, List<double> previousPrices) {
+        internal void Add(string inSymbol, List<double> inPreviousPrices) {
             int iteration = 0;
-            dataset.Add(symbol, new Matrix());
-            foreach (double price in previousPrices) {
+            dataset.Add(inSymbol, new Matrix());
+            foreach (double price in inPreviousPrices) {
                 List<double> rowCells = new List<double>();
-                if(iteration > rsi.LookBackPeriod) {
-                    double v = rsi.GetIndicatorValue(dataset[symbol], price);
+                if (iteration > rsi.LookBackPeriod) {
+                    double v = rsi.GetIndicatorValue(dataset[inSymbol], price);
                     rowCells.Add(v);
                 }
                 else {
                     rowCells.Add(0);
                 }
 
-                if(iteration > bb.LookBackPeriod) {
-                    var (lowerBand, upperBand) = bb.GetBands(dataset[symbol], price);
-                    rowCells.Add(lowerBand); 
+                if (iteration > bb.LookBackPeriod) {
+                    var (lowerBand, upperBand) = bb.GetBands(dataset[inSymbol], price);
+                    rowCells.Add(lowerBand);
                     rowCells.Add(upperBand);
                 }
                 else {
@@ -77,14 +65,15 @@ namespace AlgorithmicTrading {
                 }
 
                 // the max constant for the technical indicators lookback
-                if (dataset[symbol].Count > bbPeriod) { 
-                    dataset[symbol].Dequeue();
+                if (dataset[inSymbol].Count > bb.LookBackPeriod) {
+                    dataset[inSymbol].Dequeue();
                 }
 
                 rowCells.Add(price);
-                dataset[symbol].Enqueue(rowCells);
+                dataset[inSymbol].Enqueue(rowCells);
                 ++iteration;
             }
+            Assets[inSymbol] = 0;
         }
 
         private List<double> GetNextRow(string symbol, double price) {
