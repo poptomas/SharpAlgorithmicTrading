@@ -7,11 +7,15 @@ using System.Threading.Tasks;
 namespace AlgorithmicTrading {
 	static class Printer {
 
-		internal static void PrintHelpHeader() {
+		internal static void ShowCantAdd() {
+			Console.WriteLine("Already in the list/invalid cryptocurrency");
+		}
+
+		internal static void ShowHelpHeader() {
             Console.WriteLine("Supported commands (case insensitive, without <>): ");
         }
 
-		internal static void PrintSeparator() {
+		internal static void ShowSeparator() {
 			int lineLength = 40;
 			Console.WriteLine(new string('-', lineLength));
 		}
@@ -23,11 +27,11 @@ namespace AlgorithmicTrading {
 		internal static void PrintCommandsCommon(string inCommand, bool wasFound) {
 			if(!wasFound) {
 				PrintUnknownAction(inCommand);
-				PrintSeparator();
+				ShowSeparator();
 			}
         }
 
-		internal static void PrintHeader() {
+		internal static void ShowHeader() {
 			Console.WriteLine("ToTheMoon (Cryptocurrency Trading Bot)");
 			Console.WriteLine("For cryptocurrency symbols see https://coinmarketcap.com/exchanges/binance");
 			// slashes e.g. BTC/USDT can be included - when parsing the input it is removed anyway
