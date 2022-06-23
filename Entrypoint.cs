@@ -3,9 +3,6 @@ global using Service = AlgorithmicTrading.BinanceConnection; // CoinbaseConnecti
 global using DataAnalyzer = AlgorithmicTrading.TechnicalIndicatorsAnalyzer;
 
 namespace AlgorithmicTrading {
-
-    // set accordingly
-
     internal struct Entrypoint {
         private readonly TimeSpan delay;
 
