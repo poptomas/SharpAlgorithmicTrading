@@ -1,19 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Http;
-using System.Text;
+﻿using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Diagnostics;
 
 
 
 namespace AlgorithmicTrading {
-    using TaskList = List<Task<List<double>>>;
-
     interface IConnection {
         public void ReceiveCurrentData();
         public void PrepareDatasets(string[] input);
@@ -23,7 +14,7 @@ namespace AlgorithmicTrading {
         public ServiceNumerics Numerics { get; }
     }
 
-    sealed internal class Connection<Service> : IConnection
+    sealed class Connection<Service> : IConnection
         where Service : IConnection, new() {
         public Connection() {
             service = new Service();
@@ -77,29 +68,29 @@ namespace AlgorithmicTrading {
         private readonly Service service;
 
         internal void TryRemove(string inCryptocurrency) {
-            if(Watchlist.ContainsKey(inCryptocurrency)) {
+            if (Watchlist.ContainsKey(inCryptocurrency)) {
                 Analyzer.Remove(inCryptocurrency);
                 Watchlist.Remove(inCryptocurrency);
             }
         }
 
         internal void TryAdd(string inCryptocurrency) {
-            if (Cryptocurrencies.ContainsKey(inCryptocurrency) 
+            if (Cryptocurrencies.ContainsKey(inCryptocurrency)
             && !Watchlist.ContainsKey(inCryptocurrency)) {
+                service.PrepareDatasets(new string[1] { inCryptocurrency });
                 var cryptocurrencyAction = new Cryptocurrency(
                     inAction: State.Default,
                     inPrice: Cryptocurrencies[inCryptocurrency]
                 );
                 Watchlist[inCryptocurrency] = cryptocurrencyAction;
-                Analyzer.AddToDataset(inCryptocurrency);
             }
             else {
-                Console.WriteLine("Already in the list/invalid cryptocurrency");
+                Printer.ShowCantAdd();
             }
         }
 
         internal void TryDeposit(double inDepositValue) {
-            if(inDepositValue < Numerics.MinimumDeposit) {
+            if (inDepositValue < Numerics.MinimumDeposit) {
                 Console.WriteLine($"add at least {Numerics.MinimumDeposit}");
             }
             else {
@@ -159,7 +150,7 @@ namespace AlgorithmicTrading {
 
 
         public void ReceiveCurrentData() {
-            /*
+            /**/
             Stopwatch sw = new Stopwatch();
             sw.Start();
             /**/
@@ -184,17 +175,11 @@ namespace AlgorithmicTrading {
                 Console.WriteLine(exc.Message);
             }
             Analyzer.ProcessData(
-                data: Watchlist, 
+                data: Watchlist,
                 shallAddRow: false
             );
 
-            /*
             sw.Stop();
-            foreach (var v in Cryptocurrencies) {
-                if (v.Key.EndsWith("USDT")) {
-                    Console.WriteLine("[{0} : {1}]", v.Key, v.Value);
-                }
-            }
             Console.WriteLine("{0} ms", sw.ElapsedMilliseconds);
             /**/
         }
@@ -221,12 +206,11 @@ namespace AlgorithmicTrading {
                 inPrice: Cryptocurrencies[symbol]
             );
             Watchlist[symbol] = cryptocurrency;
-
         }
 
         private IEnumerable<string> FilterSetPreferences(string[] inSymbols) {
-            foreach(var symbol in inSymbols) {
-                if (Cryptocurrencies.ContainsKey(symbol) 
+            foreach (var symbol in inSymbols) {
+                if (Cryptocurrencies.ContainsKey(symbol)
                 && !Watchlist.ContainsKey(symbol)) {
                     AddNewCryptocurrency(symbol);
                     // give the opportunity process on the go
@@ -245,12 +229,12 @@ namespace AlgorithmicTrading {
                 var filteredSymbols = FilterSetPreferences(inSymbols);
                 var query = filteredSymbols.AsParallel().Select(symbol => {
                     return (
-                        Symbol: symbol, 
+                        Symbol: symbol,
                         Dataset: ReceiveDataset(symbol)
                      );
                 });
                 query.ForAll(part => {
-                    Analyzer.PrepareSymbol(part.Symbol, part.Dataset.Result);
+                    Analyzer.Add(part.Symbol, part.Dataset.Result);
                 });
                 sw.Stop();
                 Console.WriteLine("{0} ms", sw.ElapsedMilliseconds);
