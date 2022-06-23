@@ -50,18 +50,18 @@ namespace AlgorithmicTrading {
         }
 
         internal string[] Process() {
-            Printer.PrintHeader();
+            Printer.ShowHeader();
             return ProcessCinArguments();
         }
 
         internal void ShowInitialHelp() {
-            Printer.PrintSeparator();
+            Printer.ShowSeparator();
             ShowHelp();
-            Printer.PrintSeparator();
+            Printer.ShowSeparator();
         }
 
         internal void ShowHelp() {
-            Printer.PrintHelpHeader();
+            Printer.ShowHelpHeader();
             foreach(var (option, command) in enumMap) {
                 Console.WriteLine(command.GetLine());
             }
@@ -87,7 +87,7 @@ namespace AlgorithmicTrading {
         }
 
         internal void Withdraw() {
-            Console.WriteLine("Withdraw done.");
+            Console.WriteLine("Withdrawal done.");
         }
 
         internal void TryDepositCash(string amount) {
@@ -124,8 +124,9 @@ namespace AlgorithmicTrading {
             bool wasFound = false;
             foreach (var (key, functionCall) in paramFuncMap) {
                 var command = enumMap[key];
-                if (command.Name == tokens[0]) {
-                    functionCall(tokens[1]);
+                if (command.Name.StartsWith(tokens[0])) {
+                    var symbol = tokens[1].Filter(slash).ToUpper();
+                    functionCall(symbol);
                     wasFound = true;
                     break;
                 }
@@ -157,6 +158,7 @@ namespace AlgorithmicTrading {
                     ProcessParamCommand(tokens);
                 }
                 else {
+                    Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine("Bad decision");
                 }
             }
