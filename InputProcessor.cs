@@ -88,6 +88,7 @@ namespace AlgorithmicTrading {
 
         internal void Withdraw() {
             Console.WriteLine("Withdrawal done.");
+            service.CallWithdraw();
         }
 
         internal void TryDepositCash(string amount) {
