@@ -7,6 +7,10 @@ using System.Threading.Tasks;
 namespace AlgorithmicTrading {
 	static class Printer {
 
+		internal static void ShowTotal(double finalBalance, string currency, double fee) {
+            Console.WriteLine("You ended up with {0} {1} (withdrawal fee: {2} %)", finalBalance, currency, fee);
+        }
+
 		internal static void ShowCantAdd() {
 			Console.WriteLine("Already in the list/invalid cryptocurrency");
 		}
