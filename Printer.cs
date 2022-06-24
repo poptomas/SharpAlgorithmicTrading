@@ -11,7 +11,7 @@ namespace AlgorithmicTrading {
 			Console.WriteLine("Unknown action: \"{0}\"", userInput);
 		}
 
-		internal static void ShowDepositSuccesful(double depositValue, double fee) {
+		internal static void ShowDepositSuccessful(double depositValue, double fee) {
             Console.WriteLine("{0} USD added (deposit fee: {1:P})", depositValue, fee);
         }
 

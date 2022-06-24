@@ -67,6 +67,7 @@ namespace AlgorithmicTrading {
         public void Deposit(double depositValue) {
             double afterFee = depositValue - depositValue * Numerics.DepositFee;
             Assets[currency] += afterFee;
+            Printer.ShowDepositSuccessful(afterFee, Numerics.DepositFee);
         }
 
         internal void Add(string inSymbol, List<double> inPreviousPrices) {
@@ -128,8 +129,8 @@ namespace AlgorithmicTrading {
 
         internal void ShowAssets() {
             Console.WriteLine("Assets:");
-            foreach (var (v, w) in Assets) {
-                Console.WriteLine($"{v}: {w}");
+            foreach (var (symbol, amount) in Assets) {
+                Console.WriteLine("[{0}: {1}]", symbol, amount);
             }
         }
 
@@ -201,7 +202,6 @@ namespace AlgorithmicTrading {
             else {
                 Console.WriteLine("nothing ");
             }
-
         }
 
         internal void ProcessData(Dictionary<string, Cryptocurrency> data, bool shallAddRow) {
