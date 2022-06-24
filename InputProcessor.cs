@@ -39,7 +39,7 @@ namespace AlgorithmicTrading {
             };
 
             paramFuncMap = new Dictionary<Options, Action<string>>() {
-               { Options.Deposit, TryDepositCash },
+               { Options.Deposit, TryDeposit },
                { Options.Add, TryAddCryptocurrency },
                { Options.Remove, TryRemoveCryptocurrency },
                //...
@@ -77,7 +77,6 @@ namespace AlgorithmicTrading {
         }
 
         internal void CallAsssets() {
-            Console.WriteLine("Assets done.");
             service.CallAssets();
         }
 
@@ -91,7 +90,7 @@ namespace AlgorithmicTrading {
             service.CallWithdraw();
         }
 
-        internal void TryDepositCash(string amount) {
+        internal void TryDeposit(string amount) {
             if(double.TryParse(amount, out double total) && total > 0) {
                 service.TryDeposit(total);
             }
@@ -138,30 +137,38 @@ namespace AlgorithmicTrading {
             );
         }
 
+        private bool ReadInputInternal(ThreadController controller, string line) {
+            var lower = line.ToLower();
+            var tokens = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (tokens.Length == 1
+            && lower == enumMap[Options.Withdraw].Name) {
+                ProcessSimpleCommand(lower);
+                controller.ReleaseAll();
+                return false;
+            }
+            else if (tokens.Length == 1) {
+                ProcessSimpleCommand(lower);
+            }
+            else if (tokens.Length == 2) {
+                ProcessParamCommand(tokens);
+            }
+            else {
+                Printer.ShowUnknownAction(line);
+            }
+            return true;
+        }
+
         internal void ReadInput(ThreadController controller) {
             while (true) {
                 var line = Console.ReadLine();
                 if (line == null) {
                     continue;
                 }
-                var lower = line.ToLower();
-                var tokens = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                if(tokens.Length == 1 
-                && lower == enumMap[Options.Withdraw].Name) {
-                    ProcessSimpleCommand(lower);
-                    controller.ReleaseAll();
+                Printer.ShowSeparator();
+                if (!ReadInputInternal(controller, line)) {
                     break;
                 }
-                else if(tokens.Length == 1) {
-                    ProcessSimpleCommand(lower);
-                }
-                else if(tokens.Length == 2) {
-                    ProcessParamCommand(tokens);
-                }
-                else {
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine("Bad decision");
-                }
+                Printer.ShowSeparator();
             }
         }
 
