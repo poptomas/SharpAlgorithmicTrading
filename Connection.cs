@@ -111,6 +111,10 @@ namespace AlgorithmicTrading {
             Analyzer.ShowAssets();
         }
 
+        internal void CallWithdraw() {
+            Analyzer.Withdraw(Watchlist);
+        }
+
         internal void CallTransactions() {
             Analyzer.ShowTransactions();
         }
