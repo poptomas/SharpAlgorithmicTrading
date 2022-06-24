@@ -7,8 +7,20 @@ using System.Threading.Tasks;
 namespace AlgorithmicTrading {
 	static class Printer {
 
+		internal static void ShowUnknownAction(string userInput) {
+			Console.WriteLine("Unknown action: \"{0}\"", userInput);
+		}
+
+		internal static void ShowDepositSuccesful(double depositValue, double fee) {
+            Console.WriteLine("{0} USD added (deposit fee: {1:P})", depositValue, fee);
+        }
+
+		internal static void ShowMinDepositRequired(double minDeposit) {
+			Console.WriteLine($"add at least {0} USD", minDeposit);
+		}
+
 		internal static void ShowTotal(double finalBalance, string currency, double fee) {
-            Console.WriteLine("You ended up with {0} {1} (withdrawal fee: {2} %)", finalBalance, currency, fee);
+            Console.WriteLine("You ended up with {0} {1} (withdrawal fee: {2:P})", finalBalance, currency, fee);
         }
 
 		internal static void ShowCantAdd() {
@@ -24,14 +36,9 @@ namespace AlgorithmicTrading {
 			Console.WriteLine(new string('-', lineLength));
 		}
 
-		private static void PrintUnknownAction(string inCommand) {
-			Console.WriteLine("Unknown action: \"{0}\"", inCommand);
-		}
-
 		internal static void PrintCommandsCommon(string inCommand, bool wasFound) {
 			if(!wasFound) {
-				PrintUnknownAction(inCommand);
-				ShowSeparator();
+				ShowUnknownAction(inCommand);
 			}
         }
 
