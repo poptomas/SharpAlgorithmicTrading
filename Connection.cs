@@ -91,7 +91,7 @@ namespace AlgorithmicTrading {
 
         internal void TryDeposit(double inDepositValue) {
             if (inDepositValue < Numerics.MinimumDeposit) {
-                Console.WriteLine($"add at least {Numerics.MinimumDeposit}");
+                Printer.ShowMinDepositRequired(Numerics.MinimumDeposit);
             }
             else {
                 Analyzer.Deposit(inDepositValue);
@@ -151,7 +151,6 @@ namespace AlgorithmicTrading {
             Analyzer = new DataAnalyzer(Numerics);
             Watchlist = new Dictionary<string, Cryptocurrency>();
         }
-
 
         public void ReceiveCurrentData() {
             /**/
@@ -231,7 +230,7 @@ namespace AlgorithmicTrading {
                 var sw = new Stopwatch();
                 sw.Start();
                 var filteredSymbols = FilterSetPreferences(inSymbols);
-                var query = filteredSymbols.AsParallel().Select(symbol => {
+                var query = filteredSymbols.AsParallel().AsOrdered().Select(symbol => {
                     return (
                         Symbol: symbol,
                         Dataset: ReceiveDataset(symbol)
@@ -243,20 +242,6 @@ namespace AlgorithmicTrading {
                 sw.Stop();
                 Console.WriteLine("{0} ms", sw.ElapsedMilliseconds);
 
-                // end of the slow part
-                // easier tasks can run in serial
-                // (only 500 records per cryptocurrency symbol)
-
-                /*
-                var sw = new Stopwatch();
-                sw.Start();
-                /**/
-
-                /*
-                sw.Stop();
-                Console.WriteLine("{0} ms", sw.ElapsedMilliseconds);
-                /**/
-                // dbg
                 Analyzer.ShowDataset();
             }
             catch (HttpRequestException exc) {
