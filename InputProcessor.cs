@@ -26,23 +26,24 @@ namespace AlgorithmicTrading {
                 { Options.Indicators, new Command("indicators", "shows indicators concerning your cryptocurrency watchlist") },
                 { Options.Add, new Command("add <symbol>", "adds a cryptocurrency symbol to your watchlist") },
                 { Options.Remove, new Command("remove <symbol>", "removes a cryptocurrency symbol from your watchlist") }
+                // ...
             };
 
             simpleFuncMap = new Dictionary<Options, Action>() {
                 { Options.Help, ShowHelp },
-                { Options.Withdraw, Withdraw },
+                { Options.Withdraw, CallWithdraw },
                 { Options.Transactions, CallTransactions },
                 { Options.Assets, CallAsssets },
                 { Options.Indicators, CallIndicators },
                 { Options.Market, CallMarket },
-                //...
+                // ...
             };
 
             paramFuncMap = new Dictionary<Options, Action<string>>() {
                { Options.Deposit, TryDeposit },
-               { Options.Add, TryAddCryptocurrency },
-               { Options.Remove, TryRemoveCryptocurrency },
-               //...
+               { Options.Add, TryAdd },
+               { Options.Remove, TryRemove },
+               // ...
             };
 
             slash = '/';
@@ -85,7 +86,7 @@ namespace AlgorithmicTrading {
             service.CallMarket();
         }
 
-        internal void Withdraw() {
+        internal void CallWithdraw() {
             Console.WriteLine("Withdrawal done.");
             service.CallWithdraw();
         }
@@ -99,11 +100,11 @@ namespace AlgorithmicTrading {
             }
         }
 
-        internal void TryAddCryptocurrency(string inCryptocurrency) {
+        internal void TryAdd(string inCryptocurrency) {
             service.TryAdd(inCryptocurrency);
         }
 
-        internal void TryRemoveCryptocurrency(string inCryptocurrency) {
+        internal void TryRemove(string inCryptocurrency) {
             service.TryRemove(inCryptocurrency);
         }
 
@@ -161,7 +162,7 @@ namespace AlgorithmicTrading {
         internal void ReadInput(ThreadController controller) {
             while (true) {
                 var line = Console.ReadLine();
-                if (line == null) {
+                if (string.IsNullOrEmpty(line)) {
                     continue;
                 }
                 Printer.ShowSeparator();
