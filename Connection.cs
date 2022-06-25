@@ -9,7 +9,7 @@ namespace AlgorithmicTrading {
         public void ReceiveCurrentData();
         public void PrepareDatasets(string[] input);
         public Dictionary<string, double> Cryptocurrencies { get; }
-        public Dictionary<string, Cryptocurrency> Watchlist { get; }
+        public SortedDictionary<string, Cryptocurrency> Watchlist { get; }
         public DataAnalyzer Analyzer { get; }
         public ServiceNumerics Numerics { get; }
     }
@@ -41,7 +41,7 @@ namespace AlgorithmicTrading {
             }
         }
 
-        public Dictionary<string, Cryptocurrency> Watchlist {
+        public SortedDictionary<string, Cryptocurrency> Watchlist {
             get {
                 return service.Watchlist;
             }
@@ -71,6 +71,10 @@ namespace AlgorithmicTrading {
             if (Watchlist.ContainsKey(inCryptocurrency)) {
                 Analyzer.Remove(inCryptocurrency);
                 Watchlist.Remove(inCryptocurrency);
+                Printer.ShowRemovedSuccessfully(inCryptocurrency);
+            }
+            else {
+                Printer.ShowNotFound(inCryptocurrency);
             }
         }
 
@@ -83,9 +87,13 @@ namespace AlgorithmicTrading {
                     inPrice: Cryptocurrencies[inCryptocurrency]
                 );
                 Watchlist[inCryptocurrency] = cryptocurrencyAction;
+                Printer.ShowAddedSuccessfully(inCryptocurrency);
+            }
+            else if(Watchlist.ContainsKey(inCryptocurrency)) {
+                Printer.ShowAlreadyExists(inCryptocurrency);
             }
             else {
-                Printer.ShowCantAdd();
+                Printer.ShowNotFound(inCryptocurrency);
             }
         }
 
@@ -126,14 +134,6 @@ namespace AlgorithmicTrading {
             public double Price { get; init; }
         }
 
-        private string GetDatasetEndpoint(string inSymbol) {
-            return string.Format("{0}/api/v3/klines?symbol={1}&interval=1m", BaseUrl, inSymbol);
-        }
-
-        private string GetCurrentDataEndpoint() {
-            return string.Format("{0}/api/v3/ticker/price", BaseUrl);
-        }
-
         public BinanceConnection() {
             BaseUrl = "https://api.binance.com";
             Client = new HttpClient();
@@ -149,7 +149,7 @@ namespace AlgorithmicTrading {
                 inMinDeposit: 15
             );
             Analyzer = new DataAnalyzer(Numerics);
-            Watchlist = new Dictionary<string, Cryptocurrency>();
+            Watchlist = new SortedDictionary<string, Cryptocurrency>();
         }
 
         public void ReceiveCurrentData() {
@@ -159,17 +159,16 @@ namespace AlgorithmicTrading {
             /**/
             try {
                 string endpoint = GetCurrentDataEndpoint();
-                var response = Client.GetAsync(endpoint).ConfigureAwait(false).GetAwaiter().GetResult();
-                response.EnsureSuccessStatusCode();
-                var content = response.Content.ReadAsStringAsync().ConfigureAwait(false).GetAwaiter().GetResult();
+                var response = Client.GetStreamAsync(endpoint).GetAwaiter().GetResult();
                 Console.WriteLine("Request #{0} - Time: {1}", ++responseCounter, DateTime.Now);
 
-                // binance api - a long list of {"symbol" : "example", "price" : "0.0001"}
-                Cryptocurrencies = JsonSerializer
-                    .Deserialize<List<BinanceAPICryptocurrencyInfo>>(content, JsonOptions)
-                    .ToDictionary(member => member.Symbol, member => member.Price);
+                // binance api - a long list [ {"symbol" : "example", "price" : "0.0001"}, ..., {...} ]
+                var result = JsonSerializer
+                    .Deserialize<List<BinanceAPICryptocurrencyInfo>>(response, JsonOptions);
+                ;
+                Cryptocurrencies = result.ToDictionary(member => member.Symbol, member => member.Price);
 
-                foreach (var (symbol, info) in Watchlist) {
+                foreach (var (symbol, info) in Watchlist.ToList()) {
                     Watchlist[symbol] = new Cryptocurrency(info.Action, Cryptocurrencies[symbol]);
                 }
             }
@@ -183,24 +182,36 @@ namespace AlgorithmicTrading {
             );
 
             sw.Stop();
-            Console.WriteLine("{0} ms", sw.ElapsedMilliseconds);
+            sw.ShowMs("ReceiveCurrentData()");
             /**/
         }
 
-        public async Task<List<double>> ReceiveDataset(string name) {
+        public Task<List<double>> ReceiveDataset(string name) {
+
+            // parallelization tryout
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
             // https://binance-docs.github.io/apidocs/spot/en/#kline-candlestick-data
             int closingPriceIndex = 4;
             string endpoint = GetDatasetEndpoint(name);
-            var response = await Client.GetAsync(endpoint).ConfigureAwait(false);
-            response.EnsureSuccessStatusCode();
-            var content = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-            Console.WriteLine("Request #{0} - Time: {1}", ++responseCounter, DateTime.Now);
             List<double> result = new List<double>();
-            var storage = JsonSerializer.Deserialize<double[][]>(content, JsonOptions);
+            var response = Client.GetStreamAsync(endpoint).GetAwaiter().GetResult();
+            Console.WriteLine("Request #{0} - Time: {1}", ++responseCounter, DateTime.Now);
+            var storage = JsonSerializer.Deserialize<double[][]>(response, JsonOptions);
             foreach (var v in storage) {
                 result.Add(v[closingPriceIndex]);
             }
-            return result;
+            sw.Stop();
+            sw.ShowMs(string.Format("ReceiveDataset({0})", name));
+            return Task.FromResult(result);
+        }
+
+        private string GetDatasetEndpoint(string inSymbol) {
+            return string.Format("{0}/api/v3/klines?symbol={1}&interval=1m", BaseUrl, inSymbol);
+        }
+
+        private string GetCurrentDataEndpoint() {
+            return string.Format("{0}/api/v3/ticker/price", BaseUrl);
         }
 
         private void AddNewCryptocurrency(string symbol) {
@@ -219,8 +230,11 @@ namespace AlgorithmicTrading {
                     // give the opportunity process on the go
                     yield return symbol;
                 }
+                else if(Watchlist.ContainsKey(symbol)) {
+                    Printer.ShowAlreadyExists(symbol);
+                }
                 else {
-                    Console.WriteLine("{0} is not available", symbol);
+                    Printer.ShowIsUnavailable(symbol);
                 }
             }
         }
@@ -230,27 +244,33 @@ namespace AlgorithmicTrading {
                 var sw = new Stopwatch();
                 sw.Start();
                 var filteredSymbols = FilterSetPreferences(inSymbols);
-                var query = filteredSymbols.AsParallel().AsOrdered().Select(symbol => {
-                    return (
-                        Symbol: symbol,
-                        Dataset: ReceiveDataset(symbol)
-                     );
-                });
-                query.ForAll(part => {
-                    Analyzer.Add(part.Symbol, part.Dataset.Result);
-                });
+                var query = filteredSymbols
+                    .AsParallel()
+                    .Select(symbol => {
+                        return (
+                            Symbol: symbol,
+                            Dataset: ReceiveDataset(symbol)
+                         );
+                    });
+                lock (query) {
+                    query.ForAll(part => {
+                        Analyzer.Add(part.Symbol, part.Dataset.Result);
+                    });
+                }
                 sw.Stop();
-                Console.WriteLine("{0} ms", sw.ElapsedMilliseconds);
-
-                Analyzer.ShowDataset();
+                sw.ShowMs("PrepareDatasets");
+                //Analyzer.ShowDataset();
             }
             catch (HttpRequestException exc) {
                 Console.WriteLine(exc.Message);
             }
+            catch (AggregateException ex) {
+                Console.WriteLine(ex.Message);
+            }
         }
 
         public Dictionary<string, double> Cryptocurrencies { get; private set; }
-        public Dictionary<string, Cryptocurrency> Watchlist { get; private set; }
+        public SortedDictionary<string, Cryptocurrency> Watchlist { get; private set; }
         public DataAnalyzer Analyzer { get; init; }
 
         //TODO: delete later - make sure we fit into API limits
@@ -275,7 +295,7 @@ namespace AlgorithmicTrading {
             throw new NotImplementedException();
         }
         public Dictionary<string, double> Cryptocurrencies { get; }
-        public Dictionary<string, Cryptocurrency> Watchlist { get; }
+        public SortedDictionary<string, Cryptocurrency> Watchlist { get; }
         public DataAnalyzer Analyzer { get; }
         public ServiceNumerics Numerics { get; }
     }
