@@ -172,7 +172,6 @@ namespace AlgorithmicTrading {
                     Watchlist[symbol] = new Cryptocurrency(info.Action, Cryptocurrencies[symbol]);
                 }
             }
-
             catch (HttpRequestException exc) {
                 Console.WriteLine(exc.Message);
             }
@@ -186,7 +185,7 @@ namespace AlgorithmicTrading {
             /**/
         }
 
-        public Task<List<double>> ReceiveDataset(string name) {
+        public async Task<List<double>> ReceiveDataset(string name) {
 
             // parallelization tryout
             Stopwatch sw = new Stopwatch();
@@ -195,15 +194,20 @@ namespace AlgorithmicTrading {
             int closingPriceIndex = 4;
             string endpoint = GetDatasetEndpoint(name);
             List<double> result = new List<double>();
-            var response = Client.GetStreamAsync(endpoint).GetAwaiter().GetResult();
-            Console.WriteLine("Request #{0} - Time: {1}", ++responseCounter, DateTime.Now);
-            var storage = JsonSerializer.Deserialize<double[][]>(response, JsonOptions);
-            foreach (var v in storage) {
-                result.Add(v[closingPriceIndex]);
+            try {
+                var response = await Client.GetStreamAsync(endpoint);
+                Console.WriteLine("Request #{0} - Time: {1}", ++responseCounter, DateTime.Now);
+                var storage = JsonSerializer.Deserialize<double[][]>(response, JsonOptions);
+                foreach (var arr in storage) {
+                    result.Add(arr[closingPriceIndex]);
+                }
+                sw.Stop();
+                sw.ShowMs(string.Format("ReceiveDataset({0})", name));
             }
-            sw.Stop();
-            sw.ShowMs(string.Format("ReceiveDataset({0})", name));
-            return Task.FromResult(result);
+            catch (HttpRequestException exc) {
+                Console.WriteLine(exc.Message);
+            }
+            return result;
         }
 
         private string GetDatasetEndpoint(string inSymbol) {
@@ -227,7 +231,7 @@ namespace AlgorithmicTrading {
                 if (Cryptocurrencies.ContainsKey(symbol)
                 && !Watchlist.ContainsKey(symbol)) {
                     AddNewCryptocurrency(symbol);
-                    // give the opportunity process on the go
+                    // give the opportunity to process on the go
                     yield return symbol;
                 }
                 else if(Watchlist.ContainsKey(symbol)) {
@@ -252,11 +256,9 @@ namespace AlgorithmicTrading {
                             Dataset: ReceiveDataset(symbol)
                          );
                     });
-                lock (query) {
-                    query.ForAll(part => {
-                        Analyzer.Add(part.Symbol, part.Dataset.Result);
-                    });
-                }
+                query.ForAll(part => {
+                    Analyzer.Add(part.Symbol, part.Dataset.Result);
+                });
                 sw.Stop();
                 sw.ShowMs("PrepareDatasets");
                 //Analyzer.ShowDataset();
