@@ -5,7 +5,45 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace AlgorithmicTrading {
+
 	static class Printer {
+		internal static void ShowBuySignal(string symbol, double price) {
+			Console.ForegroundColor = ConsoleColor.Green;
+			Console.WriteLine("[BUY SIGNAL]: {0} at {1} USD", symbol, price);
+			Console.Clear();
+		}
+
+		internal static void ShowForcedSell(string symbol, double price) {
+			Console.ForegroundColor = ConsoleColor.Red;
+			Console.WriteLine("{0} was forced to be sold at {1} USD", symbol, price);
+			Console.Clear();
+		}
+
+		internal static void ShowSellSignal(string symbol, double price) {
+			Console.ForegroundColor = ConsoleColor.Red;
+			Console.WriteLine("[SELL SIGNAL]: {0} at {1} USD", symbol, price);
+			Console.Clear();
+		}
+
+		internal static void ShowAddedSuccessfully(string inCryptocurrency) {
+            Console.WriteLine("{0} added successfully", inCryptocurrency);
+		}
+
+		internal static void ShowRemovedSuccessfully(string inCryptocurrency) {
+			Console.WriteLine("{0} removed successfully", inCryptocurrency);
+		}
+
+		internal static void ShowAlreadyExists(string inSymbol) {
+			Console.WriteLine("{0} is already in your watchlist", inSymbol);
+		}
+
+		internal static void ShowNotFound(string inSymbol) {
+			Console.WriteLine("{0} was not found", inSymbol);
+		}
+
+		internal static void ShowIsUnavailable(string inSymbol) {
+			Console.WriteLine("{0} is not available", inSymbol);
+		}
 
 		internal static void ShowUnknownAction(string userInput) {
 			Console.WriteLine("Unknown action: \"{0}\"", userInput);
