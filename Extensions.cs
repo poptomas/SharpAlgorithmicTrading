@@ -1,4 +1,6 @@
-﻿namespace AlgorithmicTrading {
+﻿using System.Diagnostics;
+namespace AlgorithmicTrading {
+    using DataMap = Dictionary<string, Queue<Dictionary<string, double>>>;
 
     static class IEnumerableExtensions {
         public static IEnumerable<double> GetDifferences(this IEnumerable<double> storage) {
@@ -18,14 +20,60 @@
 
     static class StringExtensions {
         public static string Filter(this string input, char removedCharacter) {
-            return input.Replace(removedCharacter, '\0');
+            return string.Join("", input.Split(removedCharacter));
+        }
+    }
+
+   
+    static class StopwatchExtensions {
+        public static void ShowMs(this Stopwatch stopwatch) {
+            Console.WriteLine("Elapsed: {0} ms", stopwatch.ElapsedMilliseconds);
+        }
+
+        public static void ShowMs(this Stopwatch stopwatch, string message) {
+            Console.WriteLine("{0}: {1} ms", message, stopwatch.ElapsedMilliseconds);
         }
     }
 
     static class WatchlistExtensions {
-        public static void Print(this Dictionary<string, Cryptocurrency> watchList) {
+        public static void Print(this SortedDictionary<string, Cryptocurrency> watchList) {
             foreach (var (name, cryptocurrency) in watchList) {
                 Console.WriteLine("[{0}: {1}]", name, cryptocurrency.Price);
+            }
+        }
+    }
+
+    static class DataMapExtensions {
+        public static void Print(this DataMap dataset) {
+            foreach (var (symbol, matrix) in dataset) {
+                Console.WriteLine("Cryptocurrency: {0}", symbol);
+                foreach (var dict in matrix) {
+                    foreach (var (indicator, value) in dict) {
+                        Console.Write("{0:0.#####} ", indicator, value);
+                    }
+                    Console.WriteLine();
+                }
+            }
+        }
+    }
+
+    static class AssetsExtensions {
+        public static void Print(this SortedDictionary<string, double> assets) {
+            Console.WriteLine("Assets:");
+            foreach (var (symbol, amount) in assets) {
+                Console.WriteLine("[{0}: {1}]", symbol, amount);
+            }
+        }
+    }
+
+    static class IndicatorsExtensions {
+        public static void Print(this SortedDictionary<string, Dictionary<string, double>> records) {
+            Console.WriteLine("Indicators");
+            foreach (var (symbol, indicators) in records) {
+                Console.WriteLine(" {0}", symbol);
+                foreach(var (name, value) in indicators) {
+                    Console.WriteLine("     {0} : {1:0.#####}", name, value);
+                }
             }
         }
     }
