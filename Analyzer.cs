@@ -3,17 +3,20 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace AlgorithmicTrading {
-    using Matrix = Queue<List<double>>;
-    using DataMap = Dictionary<string, Queue<List<double>>>;
+    using Matrix = Queue<Dictionary<string, double>>;
+    using DataMap = Dictionary<string, Queue<Dictionary<string, double>>>;
 
     internal interface IAnalyzer {
-        public Dictionary<string, double> Assets { get; }
+        public SortedDictionary<string, double> Assets { get; }
     }
 
     internal struct TechnicalIndicatorsAnalyzer : IAnalyzer {
-        private readonly string currency;
+        private const string currency = "USD";
+        private const string priceKey = "price";
+
         private DataMap dataset;
 
         private readonly BollingerBands bb;
@@ -22,24 +25,32 @@ namespace AlgorithmicTrading {
         private readonly int investmentSplit;
 
         // sorted for the convenience
-        private SortedDictionary<string, List<double>> lastRecords;
+        private SortedDictionary<string, Dictionary<string, double>> lastRecords;
         public ServiceNumerics Numerics { get; init; }
 
-        public Dictionary<string, double> Assets { get; private set; }
+        public SortedDictionary<string, double> Assets { get; private set; }
+
+        private List<IIndicator> indicators;
 
         public TechnicalIndicatorsAnalyzer(ServiceNumerics inNumerics) {
             dataset = new DataMap();
-            lastRecords = new SortedDictionary<string, List<double>>();
+            lastRecords = new SortedDictionary<string, Dictionary<string, double>>();
             // indicators
             bb = new BollingerBands();
             rsi = new RelativeStrengthIndex();
-            currency = "USD";
-            Assets = new Dictionary<string, double>() { { currency, 0 } };
+
+            Assets = new SortedDictionary<string, double>() { { currency, 0 } };
             Numerics = inNumerics;
             investmentSplit = 20;
+
+            indicators = new List<IIndicator>() {
+                bb, rsi
+            };
+
+
         }
 
-        private double GetWithdrawalValue(Dictionary<string, Cryptocurrency> inValues) {
+        private double GetWithdrawalValue(SortedDictionary<string, Cryptocurrency> inValues) {
             double withdrawValue = Assets[currency];
             foreach (var (symbol, amount) in Assets) {
                 if (symbol != currency) {
@@ -52,9 +63,9 @@ namespace AlgorithmicTrading {
             return withdrawalAfterFee;
         }
 
-        public void Withdraw(Dictionary<string, Cryptocurrency> inValues) {
+        public void Withdraw(SortedDictionary<string, Cryptocurrency> inValues) {
             double withdrawalVal = GetWithdrawalValue(inValues);
-            foreach(var (symbol, cryptocurrency) in inValues) {
+            foreach (var (symbol, cryptocurrency) in inValues) {
                 if (Assets[symbol] > 0) {
                     ProcessSellSignalInternal(symbol, cryptocurrency.Price, wasForced: true);
                     Assets[symbol] = 0;
@@ -69,56 +80,45 @@ namespace AlgorithmicTrading {
             Assets[currency] += afterFee;
             Printer.ShowDepositSuccessful(afterFee, Numerics.DepositFee);
         }
-
+        object mutex = new object();
         internal void Add(string inSymbol, List<double> inPreviousPrices) {
-            int iteration = 0;
-            dataset.Add(inSymbol, new Matrix());
-            int prevPricesCount = inPreviousPrices.Count;
-            foreach (double price in inPreviousPrices) {
-                List<double> rowCells = new List<double>();
-                if (iteration > rsi.LookBackPeriod) {
-                    double v = rsi.GetIndicatorValue(dataset[inSymbol], price);
-                    rowCells.Add(v);
-                }
-                else {
-                    rowCells.Add(0);
-                }
+            lock (mutex) { // protect critical section from para linq threads
+                int iteration = 0;
+                dataset.Add(inSymbol, new Matrix());
+                int prevPricesCount = inPreviousPrices.Count;
+                foreach (double price in inPreviousPrices) {
+                    Dictionary<string, double> rowRecords = new Dictionary<string, double>();
 
-                if (iteration > bb.LookBackPeriod) {
-                    var (lowerBand, upperBand) = bb.GetBands(dataset[inSymbol], price);
-                    rowCells.Add(lowerBand);
-                    rowCells.Add(upperBand);
-                }
-                else {
-                    rowCells.Add(0);
-                    rowCells.Add(0);
-                }
+                    foreach (var member in indicators) {
+                        member.FillCells(ref rowRecords, iteration, dataset[inSymbol], price);
+                    }
 
-                // the max constant for the technical indicators lookback
-                if (dataset[inSymbol].Count > bb.LookBackPeriod) {
-                    dataset[inSymbol].Dequeue();
-                }
+                    if (dataset[inSymbol].Count > bb.LookBackPeriod) {
+                        dataset[inSymbol].Dequeue();
+                    }
 
-                rowCells.Add(price);
-                dataset[inSymbol].Enqueue(rowCells);
-                ++iteration;
-                if (iteration == prevPricesCount) {
-                    lastRecords[inSymbol] = rowCells;
+                    rowRecords[priceKey] = price;
+                    dataset[inSymbol].Enqueue(rowRecords);
+                    ++iteration;
+                    if (iteration == prevPricesCount) {
+                        lastRecords[inSymbol] = rowRecords;
+                    }
                 }
+                Assets[inSymbol] = 0;
             }
-            Assets[inSymbol] = 0;
         }
 
-        private List<double> GetNextRow(string symbol, double price) {
-
+        private Dictionary<string, double> GetNextRow(string symbol, double price) {
             var rsiValue = rsi.GetIndicatorValue(dataset[symbol], price);
             var (lowerBand, upperBand) = bb.GetBands(dataset[symbol], price);
 
-            Console.WriteLine("{0} {1} {2} {3}", rsiValue, lowerBand, upperBand, price);
-
-            List<double> rowCells = new List<double>() { 
-                rsiValue, lowerBand, upperBand, price 
+            var rowCells = new Dictionary<string, double>() {
+                { rsi.IndicatorName, rsiValue },
+                { bb.LIndicatorName, lowerBand },
+                { bb.UIndicatorName, upperBand },
+                { priceKey, price } 
             };
+
             lastRecords[symbol] = rowCells;
             return rowCells;
         }
@@ -128,27 +128,19 @@ namespace AlgorithmicTrading {
         }
 
         internal void ShowAssets() {
-            Console.WriteLine("Assets:");
-            foreach (var (symbol, amount) in Assets) {
-                Console.WriteLine("[{0}: {1}]", symbol, amount);
-            }
+            Assets.Print();
         }
 
         internal void ShowIndicators() {
-            Console.WriteLine("Indicators");
-            
-            foreach (var(symbol, indicators) in lastRecords) {
-                Console.WriteLine("{0}: RSI: {1:0.#####} Lower: {2:0.#####} Upper: {3:0.#####} Price: {4:0.#####}",
-                symbol, indicators[0], indicators[1], indicators[2], indicators[3]);
-            }
+            lastRecords.Print();
         }
 
         private void ProcessSellSignalInternal(string symbol, double price, bool wasForced) {
             if(wasForced) {
-                Console.WriteLine("Normal sell signal");
+                Printer.ShowForcedSell(symbol, price);
             }
             else {
-                Console.WriteLine("Force sell");
+                Printer.ShowSellSignal(symbol, price);
             }
             double cryptoAmount = Assets[symbol];
             double cryptoInFiat = cryptoAmount * price;
@@ -164,12 +156,13 @@ namespace AlgorithmicTrading {
                 ProcessSellSignalInternal(symbol, price, wasForced: false);
             }
             else {
-                Console.WriteLine("Cant sell - I dont have any");
+                // TODO move elsewhere
+                Console.WriteLine("Cant sell {0} - I dont have any", symbol);
             }
         }
 
         private void BuySignalInternal(string symbol, double price) {
-            Console.WriteLine("BUY SIGNAL");
+            Printer.ShowBuySignal(symbol, price);
             double investedValue = Assets[currency] / investmentSplit;
             double afterTradingFee = investedValue - investedValue * Numerics.TradingFee;
             double cryptoAmount = afterTradingFee / price;
@@ -184,27 +177,31 @@ namespace AlgorithmicTrading {
                 BuySignalInternal(symbol, price);
             }
             else  {
-                Console.WriteLine("Cant buy - no money");
+                // TODO move elsewhere
+                Console.WriteLine("Cant buy {0} - no money", symbol);
             }
         }
 
-        private void DecideSignal(string symbol, List<double> newRow) {
+        private void DecideSignal(string symbol, Dictionary<string, double> newRow) {
             State bbSignal = bb.GetDecision(newRow);
             State rsiSignal = rsi.GetDecision(newRow);
-            double closePrice = newRow[^1];
+            double closePrice = newRow[priceKey];
 
-            if (bbSignal == State.Buy || rsiSignal == State.Buy) {
+            if (bbSignal == State.Buy && rsiSignal == State.Buy) {
                 ProcessBuySignal(symbol, closePrice);
             }
-            else if (bbSignal == State.Sell || rsiSignal == State.Sell) {
+            else if (bbSignal == State.Sell && rsiSignal == State.Sell) {
                 ProcessSellSignal(symbol, closePrice);
             }
             else {
-                Console.WriteLine("nothing ");
+                // TODO move elsewhere
+                Console.WriteLine("For {0}: nothing ", symbol);
             }
         }
 
-        internal void ProcessData(Dictionary<string, Cryptocurrency> data, bool shallAddRow) {
+        internal void ProcessData(SortedDictionary<string, Cryptocurrency> data, bool shallAddRow) {
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
             foreach (var (symbol, cryptocurrency) in data) {
                 double price = cryptocurrency.Price;
                 var newRow = GetNextRow(symbol, price);
@@ -214,38 +211,39 @@ namespace AlgorithmicTrading {
                 }
                 DecideSignal(symbol, newRow);
             }
-
+            sw.Stop();
+            sw.ShowMs();
         }
 
         internal void ShowDataset() {
-            foreach(var (symbol, matrix) in dataset) {
-                Console.WriteLine("Cryptocurrency: {0}", symbol);
-                foreach(var v in matrix) {
-                    Console.WriteLine(string.Join(" ", v));
-                }
-            }
+            dataset.Print();
         }
 
         public void Remove(string symbol) {
             if (Assets[symbol] > 0) {
-                double lastPrice = lastRecords[symbol][^1];
-                // force sell
+                double lastPrice = lastRecords[symbol][priceKey];
+                ProcessSellSignalInternal(symbol, lastPrice, wasForced: true);
             }
             dataset.Remove(symbol);
             Assets.Remove(symbol);
             lastRecords.Remove(symbol);
-
         }
 
-        interface Indicator {
+        public interface IIndicator {
             public int LookBackPeriod { get; init; }
-            public State GetDecision(List<double> row);
+
+            void FillCells(ref Dictionary<string, double> rowCells, int iteration, Matrix queue, double price);
+            public State GetDecision(Dictionary<string, double> row);
         }
 
-        private struct BollingerBands : Indicator {
+        private struct BollingerBands : IIndicator {
             public int LookBackPeriod { get; init; }
+            public string LIndicatorName { get; init; }
+            public string UIndicatorName { get; init; }
             public BollingerBands() {
                 LookBackPeriod = 21;
+                LIndicatorName = "Lower Band";
+                UIndicatorName = "Upper Band";
             }
 
             private double GetStandardDeviation(List<double> prices, double mean) {
@@ -261,7 +259,7 @@ namespace AlgorithmicTrading {
                 List<double> prices = new List<double>();
                 var lastValues = inMatrix.TakeLast(LookBackPeriod);
                 foreach (var val in lastValues) {
-                    prices.Add(val[^1]);
+                    prices.Add(val[priceKey]);
                 }
                 prices.Add(price);
                 double mean = prices.Average();
@@ -271,10 +269,10 @@ namespace AlgorithmicTrading {
                 return (lowerBand, upperBand);
             }
 
-            public State GetDecision(List<double> row) {
-                double closingPrice = row[^1];
-                double lower = row[1];
-                double upper = row[2];
+            public State GetDecision(Dictionary<string, double> row) {
+                double closingPrice = row[priceKey];
+                double lower = row[LIndicatorName];
+                double upper = row[UIndicatorName];
                 if (closingPrice > upper) {
                     return State.Sell;
                 }
@@ -286,24 +284,38 @@ namespace AlgorithmicTrading {
                 }
             }
 
-
+            public void FillCells(
+                ref Dictionary<string, double> rowCells, int iteration, Matrix matrix, double price
+            ) {
+                if (iteration > LookBackPeriod) {
+                    var(lower, upper) = GetBands(matrix, price);
+                    rowCells["lower"] = lower;
+                    rowCells["upper"] = upper;
+                }
+                else {
+                    rowCells["lower"] = 0;
+                    rowCells["upper"] = 0;
+                }
+            }
         }
 
-        private struct RelativeStrengthIndex : Indicator {
+        private struct RelativeStrengthIndex : IIndicator {
             public int LookBackPeriod { get; init; }
             private readonly int sellSignalPercentage;
             private readonly int buySignalPercentage;
+            public string IndicatorName { get; init; }
             public RelativeStrengthIndex() {
                 LookBackPeriod = 14;
                 sellSignalPercentage = 70;
                 buySignalPercentage = 30;
+                IndicatorName = "rsi";
             }
 
             public double GetIndicatorValue(Matrix inMatrix, double price) {
                 List<double> prices = new List<double>();
                 var lastValues = inMatrix.TakeLast(LookBackPeriod);
                 foreach(var val in lastValues) {
-                    prices.Add(val[^1]);
+                    prices.Add(val[priceKey]);
                 }
                 // latest
                 prices.Add(price);
@@ -344,8 +356,8 @@ namespace AlgorithmicTrading {
                 return percentage - (percentage / (1 + relStrength));
             }
 
-            public State GetDecision(List<double> row) {
-                double rsi = row[0];
+            public State GetDecision(Dictionary<string, double> row) {
+                double rsi = row[IndicatorName];
                 if(rsi > sellSignalPercentage) {
                     return State.Sell;
                 }
@@ -354,6 +366,19 @@ namespace AlgorithmicTrading {
                 }
                 else {
                     return State.Hold;
+                }
+            }
+
+            public void FillCells(
+                ref Dictionary<string, double> rowCells, int iteration, Matrix matrix, double price
+            ) {
+                string keyword = "rsi";
+                if (iteration > LookBackPeriod) {
+                    double v = GetIndicatorValue(matrix, price);
+                    rowCells[keyword] = v;
+                }
+                else {
+                    rowCells[keyword] = 0;
                 }
             }
         }
