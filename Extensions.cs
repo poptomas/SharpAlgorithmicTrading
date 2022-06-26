@@ -12,12 +12,6 @@ namespace AlgorithmicTrading {
         }
     }
 
-    static class CollectionExtensions {
-        public static bool IsEmpty<T>(this ICollection<T> storage) {
-            return storage.Count == 0;
-        }
-    }
-
     static class StringExtensions {
         public static string Filter(this string input, char removedCharacter) {
             return string.Join("", input.Split(removedCharacter));
@@ -74,6 +68,16 @@ namespace AlgorithmicTrading {
                 foreach(var (name, value) in indicators) {
                     Console.WriteLine("     {0} : {1:0.#####}", name, value);
                 }
+            }
+        }
+    }
+
+    static class TransactionExtensions {
+        public static void Print(this Queue<Transaction> records) {
+            int lineNum = 1;
+            foreach (var item in records) {
+                Console.WriteLine("{0}. {1}", lineNum, item);
+                ++lineNum;
             }
         }
     }
