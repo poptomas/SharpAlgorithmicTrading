@@ -2,8 +2,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-
-
 namespace AlgorithmicTrading {
     interface IConnection {
         public void ReceiveCurrentData();
@@ -116,7 +114,7 @@ namespace AlgorithmicTrading {
         }
 
         internal void CallAssets() {
-            Analyzer.ShowAssets();
+            Analyzer.ShowAssets(Watchlist);
         }
 
         internal void CallWithdraw() {
