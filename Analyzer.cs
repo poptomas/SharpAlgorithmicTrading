@@ -16,21 +16,22 @@ namespace AlgorithmicTrading {
     internal struct TechnicalIndicatorsAnalyzer : IAnalyzer {
         private const string currency = "USD";
         private const string priceKey = "price";
+        private const int maxTransactions = 20; // do not keep all transactions in memory
+                                                // - just a queue of all couple of them, the full history will be stored in a file
+        private const int investmentSplit = 20;
 
+        private FSHandler fsHandler;
         private DataMap dataset;
-
+        private Queue<Transaction> transactions;
         private readonly BollingerBands bb;
         private readonly RelativeStrengthIndex rsi;
-
-        private readonly int investmentSplit;
-
-        // sorted for the convenience
+        private List<IIndicator> indicators;
         private SortedDictionary<string, Dictionary<string, double>> lastRecords;
+        private object mutex = new object();
         public ServiceNumerics Numerics { get; init; }
 
         public SortedDictionary<string, double> Assets { get; private set; }
 
-        private List<IIndicator> indicators;
 
         public TechnicalIndicatorsAnalyzer(ServiceNumerics inNumerics) {
             dataset = new DataMap();
@@ -41,13 +42,14 @@ namespace AlgorithmicTrading {
 
             Assets = new SortedDictionary<string, double>() { { currency, 0 } };
             Numerics = inNumerics;
-            investmentSplit = 20;
 
             indicators = new List<IIndicator>() {
                 bb, rsi
             };
 
-
+            transactions = new Queue<Transaction>();
+            fsHandler = new FSHandler("transactions/results.csv");
+            fsHandler.TryFlushPreviousRun();
         }
 
         private double GetWithdrawalValue(SortedDictionary<string, Cryptocurrency> inValues) {
@@ -80,7 +82,7 @@ namespace AlgorithmicTrading {
             Assets[currency] += afterFee;
             Printer.ShowDepositSuccessful(afterFee, Numerics.DepositFee);
         }
-        object mutex = new object();
+
         internal void Add(string inSymbol, List<double> inPreviousPrices) {
             lock (mutex) { // protect critical section from para linq threads
                 int iteration = 0;
@@ -124,15 +126,32 @@ namespace AlgorithmicTrading {
         }
 
         internal void ShowTransactions() {
-            throw new NotImplementedException();
+            if(transactions.Count == 0) {
+                Printer.ShowNoTransactionsAccomplished();
+            }
+            else {
+                transactions.Print();
+            }
         }
 
-        internal void ShowAssets() {
+        internal void ShowAssets(SortedDictionary<string, Cryptocurrency> inValues) {
+            var value = GetWithdrawalValue(inValues);
             Assets.Print();
+            Printer.ShowEstimatedWithdrawal(value, currency, Numerics.WithdrawalFee);
         }
 
         internal void ShowIndicators() {
             lastRecords.Print();
+        }
+
+        private void CreateTransaction(string symbol, double price, double cryptoAmount, State action) {
+            var transaction = new Transaction(symbol, price, cryptoAmount, Enum.GetName(action));
+            if(transactions.Count >= maxTransactions) {
+                transactions.Dequeue();
+            }
+            transactions.Enqueue(transaction);
+            var line = transaction.GetCSVLine();
+            fsHandler.Save(line);
         }
 
         private void ProcessSellSignalInternal(string symbol, double price, bool wasForced) {
@@ -145,9 +164,10 @@ namespace AlgorithmicTrading {
             double cryptoAmount = Assets[symbol];
             double cryptoInFiat = cryptoAmount * price;
             double afterTradingFee = cryptoInFiat - cryptoInFiat * Numerics.TradingFee;
-            // TODO CREATE TRANSACTION
+
             Assets[symbol] = 0;
             Assets[currency] += afterTradingFee;
+            CreateTransaction(symbol, price, cryptoAmount, State.Sell);
         }
 
         private void ProcessSellSignal(string symbol, double price) {
@@ -156,8 +176,7 @@ namespace AlgorithmicTrading {
                 ProcessSellSignalInternal(symbol, price, wasForced: false);
             }
             else {
-                // TODO move elsewhere
-                Console.WriteLine("Cant sell {0} - I dont have any", symbol);
+                Printer.ShowCantSell(symbol);
             }
         }
 
@@ -167,18 +186,19 @@ namespace AlgorithmicTrading {
             double afterTradingFee = investedValue - investedValue * Numerics.TradingFee;
             double cryptoAmount = afterTradingFee / price;
             Assets[currency] -= investedValue;
-            // TODO CREATE TRANSACTION
             Assets[symbol] += cryptoAmount;
+            CreateTransaction(symbol, price, cryptoAmount, State.Buy);
         }
 
         private void ProcessBuySignal(string symbol, double price) {
             var currencyAmount = Assets[currency];
-            if (currencyAmount > 1) {
+            if (currencyAmount > 1) { 
+                // it could be (and probably is) different across multiple cryptocurrency exchanges
+                // to ensure that the bot is not just working with infinitely low amounts
                 BuySignalInternal(symbol, price);
             }
             else  {
-                // TODO move elsewhere
-                Console.WriteLine("Cant buy {0} - no money", symbol);
+                Printer.ShowCantBuy(symbol);
             }
         }
 
@@ -194,8 +214,8 @@ namespace AlgorithmicTrading {
                 ProcessSellSignal(symbol, closePrice);
             }
             else {
-                // TODO move elsewhere
-                Console.WriteLine("For {0}: nothing ", symbol);
+                // TODO remove in the future, way too much spam.
+                //Console.WriteLine("For {0}: nothing ", symbol);
             }
         }
 
@@ -203,8 +223,7 @@ namespace AlgorithmicTrading {
             Stopwatch sw = new Stopwatch();
             sw.Start();
             foreach (var (symbol, cryptocurrency) in data) {
-                double price = cryptocurrency.Price;
-                var newRow = GetNextRow(symbol, price);
+                var newRow = GetNextRow(symbol, cryptocurrency.Price);
                 if (shallAddRow) {
                     dataset[symbol].Dequeue();
                     dataset[symbol].Enqueue(newRow);
@@ -242,8 +261,8 @@ namespace AlgorithmicTrading {
             public string UIndicatorName { get; init; }
             public BollingerBands() {
                 LookBackPeriod = 21;
-                LIndicatorName = "Lower Band";
-                UIndicatorName = "Upper Band";
+                LIndicatorName = "Lower band";
+                UIndicatorName = "Upper band";
             }
 
             private double GetStandardDeviation(List<double> prices, double mean) {
@@ -289,12 +308,12 @@ namespace AlgorithmicTrading {
             ) {
                 if (iteration > LookBackPeriod) {
                     var(lower, upper) = GetBands(matrix, price);
-                    rowCells["lower"] = lower;
-                    rowCells["upper"] = upper;
+                    rowCells[LIndicatorName] = lower;
+                    rowCells[UIndicatorName] = upper;
                 }
                 else {
-                    rowCells["lower"] = 0;
-                    rowCells["upper"] = 0;
+                    rowCells[LIndicatorName] = 0;
+                    rowCells[UIndicatorName] = 0;
                 }
             }
         }
@@ -308,7 +327,7 @@ namespace AlgorithmicTrading {
                 LookBackPeriod = 14;
                 sellSignalPercentage = 70;
                 buySignalPercentage = 30;
-                IndicatorName = "rsi";
+                IndicatorName = "RSI";
             }
 
             public double GetIndicatorValue(Matrix inMatrix, double price) {
