@@ -149,8 +149,79 @@ namespace AlgorithmicTrading {
             Analyzer = new DataAnalyzer(Numerics);
             Watchlist = new SortedDictionary<string, Cryptocurrency>();
         }
+        public Dictionary<string, double> Cryptocurrencies { get; private set; }
+        public SortedDictionary<string, Cryptocurrency> Watchlist { get; private set; }
+        public DataAnalyzer Analyzer { get; init; }
 
         public void ReceiveCurrentData() {
+            if (firstTime) {
+                ReceiveCurrentDataSync();
+                firstTime = false;
+            }
+            else {
+                ReceiveCurrentDataAsync();
+            }
+        }
+
+        public async Task<List<double>> ReceiveDataset(string name) {
+            // parallelization tryout
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
+            // https://binance-docs.github.io/apidocs/spot/en/#kline-candlestick-data
+            int closingPriceIndex = 4;
+            string endpoint = GetDatasetEndpoint(name);
+            List<double> result = new List<double>();
+            try {
+                var response = await Client.GetStreamAsync(endpoint).ConfigureAwait(false);
+                Console.WriteLine("Request #{0} - Time: {1}", ++responseCounter, DateTime.Now);
+                var storage = await JsonSerializer.DeserializeAsync<double[][]>(response, JsonOptions);
+                foreach (var arr in storage) {
+                    result.Add(arr[closingPriceIndex]);
+                }
+            }
+            catch (HttpRequestException exc) {
+                Console.WriteLine(exc.Message);
+            }
+            sw.Stop();
+            sw.ShowMs(string.Format("ReceiveDataset({0})", name));
+            return result;
+        }
+
+        private void FormWatchlist(List<BinanceAPICryptocurrencyInfo> parsedValues) {
+            Cryptocurrencies = parsedValues.ToDictionary(member => member.Symbol, member => member.Price);
+            foreach (var (symbol, info) in Watchlist.ToList()) {
+                Watchlist[symbol] = new Cryptocurrency(info.Action, Cryptocurrencies[symbol]);
+            }
+        }
+
+        private async void ReceiveCurrentDataAsync() {
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
+            /**/
+            try {
+                string endpoint = GetCurrentDataEndpoint();
+                var response = await Client.GetStreamAsync(endpoint).ConfigureAwait(false);
+                Console.WriteLine("Request #{0} - Time: {1}", ++responseCounter, DateTime.Now);
+
+                // binance api - a long list [ {"symbol" : "example", "price" : "0.0001"}, ..., {...} ]
+                var result = await JsonSerializer
+                    .DeserializeAsync<List<BinanceAPICryptocurrencyInfo>>(response, JsonOptions);
+                FormWatchlist(result);
+            }
+            catch (HttpRequestException exc) {
+                Console.WriteLine(exc.Message);
+            }
+            Analyzer.ProcessData(
+                data: Watchlist,
+                shallAddRow: false
+            );
+
+            sw.Stop();
+            sw.ShowMs("ReceiveCurrentDataAsync()");
+        }
+
+
+        private void ReceiveCurrentDataSync() {
             /**/
             Stopwatch sw = new Stopwatch();
             sw.Start();
@@ -164,11 +235,7 @@ namespace AlgorithmicTrading {
                 var result = JsonSerializer
                     .Deserialize<List<BinanceAPICryptocurrencyInfo>>(response, JsonOptions);
                 ;
-                Cryptocurrencies = result.ToDictionary(member => member.Symbol, member => member.Price);
-
-                foreach (var (symbol, info) in Watchlist.ToList()) {
-                    Watchlist[symbol] = new Cryptocurrency(info.Action, Cryptocurrencies[symbol]);
-                }
+                FormWatchlist(result);
             }
             catch (HttpRequestException exc) {
                 Console.WriteLine(exc.Message);
@@ -179,41 +246,8 @@ namespace AlgorithmicTrading {
             );
 
             sw.Stop();
-            sw.ShowMs("ReceiveCurrentData()");
+            sw.ShowMs("ReceiveCurrentDataSync()");
             /**/
-        }
-
-        public async Task<List<double>> ReceiveDataset(string name) {
-
-            // parallelization tryout
-            Stopwatch sw = new Stopwatch();
-            sw.Start();
-            // https://binance-docs.github.io/apidocs/spot/en/#kline-candlestick-data
-            int closingPriceIndex = 4;
-            string endpoint = GetDatasetEndpoint(name);
-            List<double> result = new List<double>();
-            try {
-                var response = await Client.GetStreamAsync(endpoint);
-                Console.WriteLine("Request #{0} - Time: {1}", ++responseCounter, DateTime.Now);
-                var storage = JsonSerializer.Deserialize<double[][]>(response, JsonOptions);
-                foreach (var arr in storage) {
-                    result.Add(arr[closingPriceIndex]);
-                }
-                sw.Stop();
-                sw.ShowMs(string.Format("ReceiveDataset({0})", name));
-            }
-            catch (HttpRequestException exc) {
-                Console.WriteLine(exc.Message);
-            }
-            return result;
-        }
-
-        private string GetDatasetEndpoint(string inSymbol) {
-            return string.Format("{0}/api/v3/klines?symbol={1}&interval=1m", BaseUrl, inSymbol);
-        }
-
-        private string GetCurrentDataEndpoint() {
-            return string.Format("{0}/api/v3/ticker/price", BaseUrl);
         }
 
         private void AddNewCryptocurrency(string symbol) {
@@ -248,6 +282,8 @@ namespace AlgorithmicTrading {
                 var filteredSymbols = FilterSetPreferences(inSymbols);
                 var query = filteredSymbols
                     .AsParallel()
+                    .AsUnordered()
+                    // testing the difference -> .WithDegreeOfParallelism(2)
                     .Select(symbol => {
                         return (
                             Symbol: symbol,
@@ -258,23 +294,26 @@ namespace AlgorithmicTrading {
                     Analyzer.Add(part.Symbol, part.Dataset.Result);
                 });
                 sw.Stop();
-                sw.ShowMs("PrepareDatasets");
+                sw.ShowMs("PrepareDatasets(string[] inSymbols)");
                 //Analyzer.ShowDataset();
             }
-            catch (HttpRequestException exc) {
+            catch (Exception exc) {
                 Console.WriteLine(exc.Message);
-            }
-            catch (AggregateException ex) {
-                Console.WriteLine(ex.Message);
             }
         }
 
-        public Dictionary<string, double> Cryptocurrencies { get; private set; }
-        public SortedDictionary<string, Cryptocurrency> Watchlist { get; private set; }
-        public DataAnalyzer Analyzer { get; init; }
+        private string GetDatasetEndpoint(string inSymbol) {
+            return string.Format("{0}/api/v3/klines?symbol={1}&interval=1m", BaseUrl, inSymbol);
+        }
 
+        private string GetCurrentDataEndpoint() {
+            return string.Format("{0}/api/v3/ticker/price", BaseUrl);
+        }
+
+        // force first synchronous data retrieval, then async only
+        private bool firstTime = true;
         //TODO: delete later - make sure we fit into API limits
-        int responseCounter = 0;
+        private int responseCounter = 0;
         private string BaseUrl { get; }
         private HttpClient Client { get; }
         private JsonSerializerOptions JsonOptions { get; }
