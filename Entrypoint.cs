@@ -42,6 +42,7 @@ namespace AlgorithmicTrading {
                     Console.WriteLine("Dataset update zzz....");
                     currentTime = updatedTime;
                 }
+                controller.Release();
             }
         }
     }

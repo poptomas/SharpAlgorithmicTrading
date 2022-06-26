@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace AlgorithmicTrading {
     internal struct ThreadController {
-        object mutex;
+        private object mutex;
         public ThreadController() {
             mutex = new object();
         }
