@@ -231,7 +231,6 @@ namespace AlgorithmicTrading {
                 var response = Client.GetStreamAsync(endpoint).GetAwaiter().GetResult();
                 Console.WriteLine("Request #{0} - Time: {1}", ++responseCounter, DateTime.Now);
 
-                // binance api - a long list [ {"symbol" : "example", "price" : "0.0001"}, ..., {...} ]
                 var result = JsonSerializer
                     .Deserialize<List<BinanceAPICryptocurrencyInfo>>(response, JsonOptions);
                 ;
@@ -276,10 +275,11 @@ namespace AlgorithmicTrading {
         }
 
         public void PrepareDatasets(string[] inSymbols) {
+            var sw = new Stopwatch();
+            sw.Start();
+            var filteredSymbols = FilterSetPreferences(inSymbols);
+
             try {
-                var sw = new Stopwatch();
-                sw.Start();
-                var filteredSymbols = FilterSetPreferences(inSymbols);
                 var query = filteredSymbols
                     .AsParallel()
                     .AsUnordered()
@@ -293,13 +293,13 @@ namespace AlgorithmicTrading {
                 query.ForAll(part => {
                     Analyzer.Add(part.Symbol, part.Dataset.Result);
                 });
-                sw.Stop();
-                sw.ShowMs("PrepareDatasets(string[] inSymbols)");
                 //Analyzer.ShowDataset();
             }
             catch (Exception exc) {
                 Console.WriteLine(exc.Message);
             }
+            sw.Stop();
+            sw.ShowMs("PrepareDatasets(string[] inSymbols)");
         }
 
         private string GetDatasetEndpoint(string inSymbol) {
