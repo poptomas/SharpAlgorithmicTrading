@@ -10,19 +10,19 @@ namespace AlgorithmicTrading {
 		internal static void ShowBuySignal(string symbol, double price) {
 			Console.ForegroundColor = ConsoleColor.Green;
 			Console.WriteLine("[BUY SIGNAL]: {0} at {1} USD", symbol, price);
-			Console.Clear();
+			Console.ResetColor();
 		}
 
 		internal static void ShowForcedSell(string symbol, double price) {
 			Console.ForegroundColor = ConsoleColor.Red;
 			Console.WriteLine("{0} was forced to be sold at {1} USD", symbol, price);
-			Console.Clear();
+			Console.ResetColor();
 		}
 
 		internal static void ShowSellSignal(string symbol, double price) {
 			Console.ForegroundColor = ConsoleColor.Red;
 			Console.WriteLine("[SELL SIGNAL]: {0} at {1} USD", symbol, price);
-			Console.Clear();
+			Console.ResetColor();
 		}
 
 		internal static void ShowAddedSuccessfully(string inCryptocurrency) {
@@ -80,13 +80,27 @@ namespace AlgorithmicTrading {
 			}
         }
 
+		internal static void ShowEstimatedWithdrawal(double estBalance, string currency, double fee) {
+			Console.WriteLine("Estimated withdrawal: {0:0.#####} {1} (after {2:P} fee)", estBalance, currency, fee);
+		}
+
+		internal static void ShowNoTransactionsAccomplished() {
+			Console.WriteLine("No transactions have been accomplished yet.");
+		}
+
 		internal static void ShowHeader() {
-			Console.WriteLine("ToTheMoon (Cryptocurrency Trading Bot)");
-			Console.WriteLine("For cryptocurrency symbols see https://coinmarketcap.com/exchanges/binance");
+			Console.WriteLine("Algorithmic Trading Bot for Cryptocurrency");
+			Console.WriteLine("	For cryptocurrency symbols see https://coinmarketcap.com/exchanges/binance");
 			// slashes e.g. BTC/USDT can be included - when parsing the input it is removed anyway
-			Console.WriteLine("- an example to use: BTCUSDT ETHUSDT SOLUSDT ADAUSDT (case insensitive, slash can be included)");
+			Console.WriteLine("	- an example to use: BTCUSDT ETHUSDT SOLUSDT ADAUSDT (case insensitive, slash can be included)");
 			Console.Write("Add cryptocurrency symbols to your watchlist: ");
 		}
 
+		internal static void ShowCantSell(string symbol) {
+			Console.WriteLine("{0} cannot be sold - you do not possess any", symbol);
+		}
+		internal static void ShowCantBuy(string symbol) {
+			Console.WriteLine("{0} cannot be bought - deposit to increase funds", symbol);
+		}
 	}
 }
