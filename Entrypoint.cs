@@ -7,7 +7,7 @@ namespace AlgorithmicTrading {
         private readonly TimeSpan delay;
 
         public Entrypoint() {
-            delay = TimeSpan.FromSeconds(10);
+            delay = TimeSpan.FromSeconds(1);
         }
 
         internal void Run() {
