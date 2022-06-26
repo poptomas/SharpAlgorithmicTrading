@@ -7,9 +7,9 @@ using System.Threading.Tasks;
 namespace AlgorithmicTrading {
     internal class InputProcessor {
         enum Options { Add, Assets, Deposit, Help, Indicators, Market, Remove, Transactions, Withdraw };
-        private Dictionary<Options, Command> enumMap;
-        private Dictionary<Options, Action> simpleFuncMap;
-        private Dictionary<Options, Action<string>> paramFuncMap;
+        private readonly Dictionary<Options, Command> enumMap;
+        private readonly Dictionary<Options, Action> simpleFuncMap;
+        private readonly Dictionary<Options, Action<string>> paramFuncMap;
         private readonly Connection<Service> service;
 
         public InputProcessor(Connection<Service> inConnection) {
@@ -69,7 +69,6 @@ namespace AlgorithmicTrading {
         }
 
         internal void CallTransactions() {
-            Console.WriteLine("Transactions done.");
             service.CallTransactions();
         }
 
@@ -82,12 +81,10 @@ namespace AlgorithmicTrading {
         }
 
         internal void CallMarket() {
-            Console.WriteLine("Market done.");
             service.CallMarket();
         }
 
         internal void CallWithdraw() {
-            Console.WriteLine("Withdrawal done.");
             service.CallWithdraw();
         }
 
@@ -96,6 +93,7 @@ namespace AlgorithmicTrading {
                 service.TryDeposit(total);
             }
             else {
+                // TODO CHANGE
                 Console.WriteLine("Problem.");
             }
         }
