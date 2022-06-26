@@ -19,6 +19,7 @@ namespace AlgorithmicTrading {
         private const int maxTransactions = 20; // do not keep all transactions in memory
                                                 // - just a queue of all couple of them, the full history will be stored in a file
         private const int investmentSplit = 20;
+        private readonly int maxLookback;
 
         private FSHandler fsHandler;
         private DataMap dataset;
@@ -32,21 +33,17 @@ namespace AlgorithmicTrading {
 
         public SortedDictionary<string, double> Assets { get; private set; }
 
-
         public TechnicalIndicatorsAnalyzer(ServiceNumerics inNumerics) {
             dataset = new DataMap();
             lastRecords = new SortedDictionary<string, Dictionary<string, double>>();
+            Assets = new SortedDictionary<string, double>() { { currency, 0 } };
+            Numerics = inNumerics;
             // indicators
             bb = new BollingerBands();
             rsi = new RelativeStrengthIndex();
-
-            Assets = new SortedDictionary<string, double>() { { currency, 0 } };
-            Numerics = inNumerics;
-
-            indicators = new List<IIndicator>() {
-                bb, rsi
-            };
-
+            indicators = new List<IIndicator>() { bb, rsi };
+            maxLookback = indicators.Select(c => c.LookBackPeriod).Max();
+            // transactions
             transactions = new Queue<Transaction>();
             fsHandler = new FSHandler("transactions/results.csv");
             fsHandler.TryFlushPreviousRun();
@@ -95,7 +92,7 @@ namespace AlgorithmicTrading {
                         member.FillCells(ref rowRecords, iteration, dataset[inSymbol], price);
                     }
 
-                    if (dataset[inSymbol].Count > bb.LookBackPeriod) {
+                    if (dataset[inSymbol].Count > maxLookback) {
                         dataset[inSymbol].Dequeue();
                     }
 
@@ -251,8 +248,8 @@ namespace AlgorithmicTrading {
         public interface IIndicator {
             public int LookBackPeriod { get; init; }
 
-            void FillCells(ref Dictionary<string, double> rowCells, int iteration, Matrix queue, double price);
             public State GetDecision(Dictionary<string, double> row);
+            public void FillCells(ref Dictionary<string, double> rowCells, int iteration, Matrix queue, double price);
         }
 
         private struct BollingerBands : IIndicator {
