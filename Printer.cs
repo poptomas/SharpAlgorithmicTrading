@@ -54,7 +54,7 @@ namespace AlgorithmicTrading {
         }
 
 		internal static void ShowMinDepositRequired(double minDeposit) {
-			Console.WriteLine($"add at least {0} USD", minDeposit);
+			Console.WriteLine("Deposit at least {0} USD", minDeposit);
 		}
 
 		internal static void ShowTotal(double finalBalance, string currency, double fee) {

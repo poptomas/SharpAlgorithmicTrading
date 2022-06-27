@@ -183,7 +183,7 @@ namespace AlgorithmicTrading {
             else {
                 // "preparing for the signal"
                 // TODO - remove later
-                Console.WriteLine("Prepare for the [SELL] signal with {0}", symbol);
+                Console.WriteLine("Prepare for the [SELL] signal with {0} ({1}x)", symbol, signalCounterMap[symbol]);
             }
         }
 
@@ -214,7 +214,7 @@ namespace AlgorithmicTrading {
             else  {
                 // "preparing for the signal"
                 // TODO - remove later - spamming
-                Console.WriteLine("Prepare for the [BUY] signal with {0}", symbol);
+                Console.WriteLine("Prepare for the [BUY] signal with {0} ({1}x)", symbol, signalCounterMap[symbol]);
             }
         }
 
