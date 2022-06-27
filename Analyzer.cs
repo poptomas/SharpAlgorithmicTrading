@@ -19,6 +19,7 @@ namespace AlgorithmicTrading {
         private const int maxTransactions = 20; // do not keep all transactions in memory
                                                 // - just a queue of all couple of them, the full history will be stored in a file
         private const int investmentSplit = 20;
+        private const int signalThreshold = 10;
         private readonly int maxLookback;
 
         private FSHandler fsHandler;
@@ -28,6 +29,7 @@ namespace AlgorithmicTrading {
         private readonly RelativeStrengthIndex rsi;
         private List<IIndicator> indicators;
         private SortedDictionary<string, Dictionary<string, double>> lastRecords;
+        private Dictionary<string, int> signalCounterMap;
         private object mutex = new object();
         public ServiceNumerics Numerics { get; init; }
 
@@ -39,6 +41,7 @@ namespace AlgorithmicTrading {
             Assets = new SortedDictionary<string, double>() { { currency, 0 } };
             Numerics = inNumerics;
             // indicators
+            signalCounterMap = new Dictionary<string, int>();
             bb = new BollingerBands();
             rsi = new RelativeStrengthIndex();
             indicators = new List<IIndicator>() { bb, rsi };
@@ -104,6 +107,7 @@ namespace AlgorithmicTrading {
                     }
                 }
                 Assets[inSymbol] = 0;
+                signalCounterMap[inSymbol] = 0;
             }
         }
 
@@ -161,19 +165,25 @@ namespace AlgorithmicTrading {
             double cryptoAmount = Assets[symbol];
             double cryptoInFiat = cryptoAmount * price;
             double afterTradingFee = cryptoInFiat - cryptoInFiat * Numerics.TradingFee;
-
             Assets[symbol] = 0;
             Assets[currency] += afterTradingFee;
+            signalCounterMap[symbol] = 0; // start over for another signal to come
             CreateTransaction(symbol, price, cryptoAmount, State.Sell);
         }
 
         private void ProcessSellSignal(string symbol, double price) {
+            ++signalCounterMap[symbol];
             var cryptoAmount = Assets[symbol];
-            if(cryptoAmount > 0) {
+            if(cryptoAmount > 0 && signalCounterMap[symbol] >= signalThreshold) {
                 ProcessSellSignalInternal(symbol, price, wasForced: false);
             }
-            else {
+            else if(cryptoAmount == 0 && signalCounterMap[symbol] >= signalThreshold) {
                 Printer.ShowCantSell(symbol);
+            }
+            else {
+                // "preparing for the signal"
+                // TODO - remove later
+                Console.WriteLine("Prepare for the [SELL] signal with {0}", symbol);
             }
         }
 
@@ -184,18 +194,27 @@ namespace AlgorithmicTrading {
             double cryptoAmount = afterTradingFee / price;
             Assets[currency] -= investedValue;
             Assets[symbol] += cryptoAmount;
+            signalCounterMap[symbol] = 0; // start over for another signal to come
             CreateTransaction(symbol, price, cryptoAmount, State.Buy);
         }
 
         private void ProcessBuySignal(string symbol, double price) {
+            ++signalCounterMap[symbol];
+
             var currencyAmount = Assets[currency];
-            if (currencyAmount > 1) { 
+            if (currencyAmount > 1 && signalCounterMap[symbol] >= signalThreshold) { 
                 // it could be (and probably is) different across multiple cryptocurrency exchanges
                 // to ensure that the bot is not just working with infinitely low amounts
                 BuySignalInternal(symbol, price);
             }
-            else  {
+            else if(currencyAmount <= 1 && signalCounterMap[symbol] >= signalThreshold) {
                 Printer.ShowCantBuy(symbol);
+                signalCounterMap[symbol] = 0;
+            }
+            else  {
+                // "preparing for the signal"
+                // TODO - remove later - spamming
+                Console.WriteLine("Prepare for the [BUY] signal with {0}", symbol);
             }
         }
 
@@ -211,8 +230,7 @@ namespace AlgorithmicTrading {
                 ProcessSellSignal(symbol, closePrice);
             }
             else {
-                // TODO remove in the future, way too much spam.
-                //Console.WriteLine("For {0}: nothing ", symbol);
+                signalCounterMap[symbol] = 0;
             }
         }
 
