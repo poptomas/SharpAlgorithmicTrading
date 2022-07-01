@@ -106,7 +106,12 @@ namespace AlgorithmicTrading {
 
         internal void CallMarket() {
             // accessible from connection
-            Watchlist.Print();
+            if (Watchlist.Count == 0) {
+                Printer.ShowWatchlistEmpty();
+            }
+            else {
+                Watchlist.Print();
+            }
         }
 
         internal void CallIndicators() {
@@ -164,17 +169,22 @@ namespace AlgorithmicTrading {
         }
 
         public async Task<List<double>> ReceiveDataset(string name) {
+            /**/
             // parallelization tryout
             Stopwatch sw = new Stopwatch();
             sw.Start();
+            /**/
+
             // https://binance-docs.github.io/apidocs/spot/en/#kline-candlestick-data
             int closingPriceIndex = 4;
             string endpoint = GetDatasetEndpoint(name);
             List<double> result = new List<double>();
             try {
-                var response = await Client.GetStreamAsync(endpoint).ConfigureAwait(false);
+                var response = await Client
+                    .GetStreamAsync(endpoint);
                 //Console.WriteLine("Request #{0} - Time: {1}", ++responseCounter, DateTime.Now);
-                var storage = await JsonSerializer.DeserializeAsync<double[][]>(response, JsonOptions);
+                var storage = await JsonSerializer
+                    .DeserializeAsync<double[][]>(response, JsonOptions);
                 foreach (var arr in storage) {
                     result.Add(arr[closingPriceIndex]);
                 }
@@ -182,8 +192,10 @@ namespace AlgorithmicTrading {
             catch (HttpRequestException exc) {
                 Console.WriteLine(exc.Message);
             }
+            /*
             sw.Stop();
             sw.ShowMs(string.Format("ReceiveDataset({0})", name));
+            /**/
             return result;
         }
 
@@ -195,18 +207,64 @@ namespace AlgorithmicTrading {
         }
 
         private async void ReceiveCurrentDataAsync() {
+            /*
             Stopwatch sw = new Stopwatch();
             sw.Start();
             /**/
+
             try {
                 string endpoint = GetCurrentDataEndpoint();
-                var response = await Client.GetStreamAsync(endpoint).ConfigureAwait(false);
-                //Console.WriteLine("Request #{0} - Time: {1}", ++responseCounter, DateTime.Now);
 
+                // for deserialization:
                 // binance api - a long list [ {"symbol" : "example", "price" : "0.0001"}, ..., {...} ]
+
+                /**/
+                //variant 1)
+                Stopwatch sw = new Stopwatch();
+                sw.Start();
+                var response = await Client.GetStreamAsync(endpoint);
+                sw.Stop();  
+                sw.ShowMs("Part 1");
+                sw.Restart();
                 var result = await JsonSerializer
                     .DeserializeAsync<List<BinanceAPICryptocurrencyInfo>>(response, JsonOptions);
+                sw.Stop();
+                sw.ShowMs("Part 2");
+                /**/
+
+                /*
+                //variant 2)
+                Stopwatch sw = new Stopwatch();
+                sw.Start();
+                var response = await Client.GetStringAsync(endpoint);
+                var result = JsonSerializer.Deserialize<List<BinanceAPICryptocurrencyInfo>>(response, JsonOptions);
+                /**/
+
+                /*
+                //variant 3)
+                Stopwatch sw = new Stopwatch();
+                sw.Start();
+                var response = await Client.GetAsync(endpoint);
+                response.EnsureSuccessStatusCode();
+                sw.Stop();  
+                sw.ShowMs("Part 1");
+                sw.Restart();
+                var content = await response.Content.ReadAsStreamAsync();
+                sw.Stop();
+                sw.ShowMs("Part 2");
+                sw.Restart();
+                var result = await JsonSerializer.DeserializeAsync<List<BinanceAPICryptocurrencyInfo>>(content, JsonOptions);
+                sw.Stop();
+                sw.ShowMs("Part 3");
+                /**/
+
+
+                //Console.WriteLine("Request #{0} - Time: {1}", ++responseCounter, DateTime.Now);
+
                 FormWatchlist(result);
+            }
+            catch (TaskCanceledException) { // time exceeded
+                return;
             }
             catch (HttpRequestException exc) {
                 Console.WriteLine(exc.Message);
@@ -216,20 +274,22 @@ namespace AlgorithmicTrading {
                 shallAddRow: false
             );
 
+            /*
             sw.Stop();
-            //sw.ShowMs("ReceiveCurrentDataAsync()");
+            sw.ShowMs("ReceiveCurrentDataAsync()");
+            /**/
         }
 
 
         private void ReceiveCurrentDataSync() {
-            /**/
+            /*
             Stopwatch sw = new Stopwatch();
             sw.Start();
             /**/
             try {
                 string endpoint = GetCurrentDataEndpoint();
                 var response = Client.GetStreamAsync(endpoint).GetAwaiter().GetResult();
-                Console.WriteLine("Request #{0} - Time: {1}", ++responseCounter, DateTime.Now);
+                //Console.WriteLine("Request #{0} - Time: {1}", ++responseCounter, DateTime.Now);
 
                 var result = JsonSerializer
                     .Deserialize<List<BinanceAPICryptocurrencyInfo>>(response, JsonOptions);
@@ -243,7 +303,7 @@ namespace AlgorithmicTrading {
                 data: Watchlist,
                 shallAddRow: false
             );
-
+            /*
             sw.Stop();
             sw.ShowMs("ReceiveCurrentDataSync()");
             /**/
@@ -275,8 +335,10 @@ namespace AlgorithmicTrading {
         }
 
         public void PrepareDatasets(string[] inSymbols) {
+            /**/
             var sw = new Stopwatch();
             sw.Start();
+            /**/
             var filteredSymbols = FilterSetPreferences(inSymbols);
 
             try {
@@ -298,8 +360,11 @@ namespace AlgorithmicTrading {
             catch (Exception exc) {
                 Console.WriteLine(exc.Message);
             }
+
+            /**/
             sw.Stop();
             sw.ShowMs("PrepareDatasets(string[] inSymbols)");
+            /**/
         }
 
         private string GetDatasetEndpoint(string inSymbol) {
