@@ -1,6 +1,8 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 
+using System.Diagnostics;
+
 namespace AlgorithmicTrading {
     interface IConnection {
         public void ReceiveCurrentData();
@@ -156,6 +158,7 @@ namespace AlgorithmicTrading {
         public Dictionary<string, double> Cryptocurrencies { get; private set; }
         public SortedDictionary<string, Cryptocurrency> Watchlist { get; private set; }
         public DataAnalyzer Analyzer { get; init; }
+        public ServiceNumerics Numerics { get; }
 
         public void ReceiveCurrentData() {
             if (firstTime) {
@@ -167,7 +170,33 @@ namespace AlgorithmicTrading {
             }
         }
 
-        public async Task<List<double>> ReceiveDataset(string name) {
+        public void PrepareDatasets(string[] inSymbols) {
+            if (inSymbols.Length == 0) {
+                Printer.WarnEmptyWatchlist();
+            }
+            var filteredSymbols = FilterSetPreferences(inSymbols);
+            try {
+                var query = filteredSymbols
+                    .AsParallel()
+                    .AsUnordered()
+                    // testing the difference -> .WithDegreeOfParallelism(2)
+                    .Select(symbol => {
+                        return (
+                            Symbol: symbol,
+                            Dataset: ReceiveDataset(symbol)
+                         );
+                    });
+                query.ForAll(part => {
+                    Analyzer.Add(part.Symbol, part.Dataset.Result);
+                });
+                //Analyzer.ShowDataset();
+            }
+            catch (Exception exc) {
+                Console.WriteLine(exc.Message);
+            }
+        }
+
+        private async Task<List<double>> ReceiveDataset(string name) {
             // https://binance-docs.github.io/apidocs/spot/en/#kline-candlestick-data
             int closingPriceIndex = 4;
             string endpoint = GetDatasetEndpoint(name);
@@ -198,12 +227,12 @@ namespace AlgorithmicTrading {
         private async void ReceiveCurrentDataAsync() {
             string endpoint = GetCurrentDataEndpoint();
             try {
-                // for deserialization:
-                // binance api - a long list [ {"symbol" : "example", "price" : "0.0001"}, ..., {...} ]
-
-                var response = await Client.GetStreamAsync(endpoint);
+                // Deserialization of Binance API
+                // - a single long list, such as [ {"symbol" : "example", "price" : "0.0001"}, ..., {...} ]
+                var response = await Client.GetStreamAsync(endpoint).ConfigureAwait(false);
                 var result = await JsonSerializer
-                    .DeserializeAsync<List<BinanceAPICryptocurrencyInfo>>(response, JsonOptions);
+                    .DeserializeAsync<List<BinanceAPICryptocurrencyInfo>>(response, JsonOptions)
+                    .ConfigureAwait(false);
                 FormWatchlist(result);
             }
             catch (HttpRequestException) {
@@ -220,8 +249,6 @@ namespace AlgorithmicTrading {
             string endpoint = GetCurrentDataEndpoint();
             try {
                 var response = Client.GetStreamAsync(endpoint).GetAwaiter().GetResult();
-                //Console.WriteLine("Request #{0} - Time: {1}", ++responseCounter, DateTime.Now);
-
                 var result = JsonSerializer
                     .Deserialize<List<BinanceAPICryptocurrencyInfo>>(response, JsonOptions);
                 ;
@@ -249,8 +276,7 @@ namespace AlgorithmicTrading {
                 if (Cryptocurrencies.ContainsKey(symbol)
                 && !Watchlist.ContainsKey(symbol)) {
                     AddNewCryptocurrency(symbol);
-                    // give the opportunity to process on the go
-                    yield return symbol;
+                    yield return symbol; // give the opportunity to process gradually
                 }
                 else if(Watchlist.ContainsKey(symbol)) {
                     Printer.WarnAlreadyInWatchlist(symbol);
@@ -259,33 +285,6 @@ namespace AlgorithmicTrading {
                     Printer.WarnIsUnavailable(symbol);
                 }
             }
-        }
-
-        public void PrepareDatasets(string[] inSymbols) {
-            if (inSymbols.Length == 0) {
-                Printer.WarnEmptyWatchlist();
-            }
-            var filteredSymbols = FilterSetPreferences(inSymbols);
-            try {
-                var query = filteredSymbols
-                    .AsParallel()
-                    .AsUnordered()
-                    // testing the difference -> .WithDegreeOfParallelism(2)
-                    .Select(symbol => {
-                        return (
-                            Symbol: symbol,
-                            Dataset: ReceiveDataset(symbol)
-                         );
-                    });
-                query.ForAll(part => {
-                    Analyzer.Add(part.Symbol, part.Dataset.Result);
-                });
-                //Analyzer.ShowDataset();
-            }
-            catch (Exception exc) {
-                Console.WriteLine(exc.Message);
-            }
-
         }
 
         private string GetDatasetEndpoint(string inSymbol) {
@@ -301,7 +300,6 @@ namespace AlgorithmicTrading {
         private string BaseUrl { get; }
         private HttpClient Client { get; }
         private JsonSerializerOptions JsonOptions { get; }
-        public ServiceNumerics Numerics { get; }
     }
 
     sealed internal class DummyConnection : IConnection {
