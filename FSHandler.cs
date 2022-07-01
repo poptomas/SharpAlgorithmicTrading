@@ -24,19 +24,20 @@ namespace AlgorithmicTrading {
                 else if(File.Exists(file)) {
                     File.Delete(file);
                 }
+                writer = new StreamWriter(file);
             }
-            catch (Exception e){
-                Console.WriteLine(e.Message);
+            catch(IOException) {
+                Printer.WarnFileOpen();
             }
-            writer = new StreamWriter(file);
+            
         }
 
         public void Save(string row) {
             try {
                 writer.WriteLine(row);
             }
-            catch(IOException exc) {
-                Console.WriteLine(exc.Message);
+            catch(IOException) {
+                Printer.WarnFileOpen();
             }
         }
     }
