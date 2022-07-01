@@ -182,12 +182,13 @@ namespace AlgorithmicTrading {
                 ProcessSellSignalInternal(symbol, price, wasForced: false);
             }
             else if(cryptoAmount == 0 && signalCounterMap[symbol] >= signalThreshold) {
-                Printer.ShowCantSell(symbol);
+                Printer.ShowCantSell(symbol, price);
+                signalCounterMap[symbol] = 0;
             }
             else {
-                // "preparing for the signal"
                 // TODO - remove later
-                Console.WriteLine("Prepare for the [SELL] signal with {0} ({1}x)", symbol, signalCounterMap[symbol]);
+                // "preparing for the signal"
+                //Console.WriteLine("Prepare for the [SELL] signal with {0} ({1}x)", symbol, signalCounterMap[symbol]);
             }
         }
 
@@ -212,13 +213,14 @@ namespace AlgorithmicTrading {
                 BuySignalInternal(symbol, price);
             }
             else if(currencyAmount <= 1 && signalCounterMap[symbol] >= signalThreshold) {
-                Printer.ShowCantBuy(symbol);
+                Printer.ShowCantBuy(symbol, price);
                 signalCounterMap[symbol] = 0;
             }
             else  {
                 // "preparing for the signal"
                 // TODO - remove later - spamming
-                Console.WriteLine("Prepare for the [BUY] signal with {0} ({1}x)", symbol, signalCounterMap[symbol]);
+                
+                //Console.WriteLine("Prepare for the [BUY] signal with {0} ({1}x)", symbol, signalCounterMap[symbol]);
             }
         }
 
@@ -281,7 +283,7 @@ namespace AlgorithmicTrading {
             public string LIndicatorName { get; init; }
             public string UIndicatorName { get; init; }
             public BollingerBands() {
-                LookBackPeriod = 21;
+                LookBackPeriod = 20; // 21 including the latest price
                 LIndicatorName = "Lower band";
                 UIndicatorName = "Upper band";
             }
@@ -345,7 +347,7 @@ namespace AlgorithmicTrading {
             private readonly int buySignalPercentage;
             public string IndicatorName { get; init; }
             public RelativeStrengthIndex() {
-                LookBackPeriod = 14;
+                LookBackPeriod = 13; // 14 including the latest price
                 sellSignalPercentage = 70;
                 buySignalPercentage = 30;
                 IndicatorName = "RSI";
