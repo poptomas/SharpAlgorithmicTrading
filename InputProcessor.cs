@@ -51,18 +51,18 @@ namespace AlgorithmicTrading {
         }
 
         internal string[] Process() {
-            Printer.ShowHeader();
+            Printer.DisplayHeader();
             return ProcessCinArguments();
         }
 
         internal void ShowInitialHelp() {
-            Printer.ShowSeparator();
+            Printer.DisplaySeparator();
             ShowHelp();
-            Printer.ShowSeparator();
+            Printer.DisplaySeparator();
         }
 
         internal void ShowHelp() {
-            Printer.ShowHelpHeader();
+            Printer.DisplayHelpHeader();
             foreach(var (option, command) in enumMap) {
                 Console.WriteLine(command.GetLine());
             }
@@ -93,7 +93,7 @@ namespace AlgorithmicTrading {
                 service.TryDeposit(total);
             }
             else {
-                Printer.ShowInvalidAmount();
+                Printer.WarnInvalidAmount();
             }
         }
 
@@ -148,7 +148,7 @@ namespace AlgorithmicTrading {
                 ProcessParamCommand(tokens);
             }
             else {
-                Printer.ShowUnknownAction(line);
+                Printer.WarnUnknownAction(line);
                 ShowHelp();
             }
             return true;
@@ -160,12 +160,12 @@ namespace AlgorithmicTrading {
                 if (string.IsNullOrEmpty(line)) {
                     continue;
                 }
-                Printer.ShowSeparator();
-                Printer.ShowTime();
+                Printer.DisplaySeparator();
+                Printer.DisplayTime();
                 if (!ReadInputInternal(controller, line)) {
                     break;
                 }
-                Printer.ShowSeparator();
+                Printer.DisplaySeparator();
             }
         }
 
