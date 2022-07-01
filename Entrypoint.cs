@@ -22,24 +22,24 @@ namespace AlgorithmicTrading {
 
         private void RunLoop(Connection<Service> conn, InputProcessor proc) {
             DateTime currentTime = DateTime.Now;
+            bool isInitial = true;
+
             ThreadController controller = new ThreadController();
-            
             ThreadStart cinDelegate = () => {
                 proc.ReadInput(controller);
             };
-            
             Thread cinThread = new Thread(cinDelegate);
             cinThread.Start();
+
             while (cinThread.IsAlive) {
-                if (controller.WaitFor(delay)) {
+                if (isInitial || controller.WaitFor(delay)) {
                     conn.ReceiveCurrentData();
+                    isInitial = false;
                 }
                 DateTime updatedTime = DateTime.Now;
                 TimeSpan elapsed = updatedTime - currentTime;
                 if (elapsed >= TimeSpan.FromMinutes(1)) {
-                    // get the latest info possible before update
                     conn.UpdateDataset();
-                    Console.WriteLine("Dataset update zzz....");
                     currentTime = updatedTime;
                 }
                 controller.Release();
