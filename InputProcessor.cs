@@ -25,7 +25,7 @@ namespace AlgorithmicTrading {
                 { Options.Market, new Command("market", "shows current cryptocurrency market prices from your watchlist") },
                 { Options.Indicators, new Command("indicators", "shows indicators concerning your cryptocurrency watchlist") },
                 { Options.Add, new Command("add <symbol>", "adds a cryptocurrency symbol to your watchlist") },
-                { Options.Remove, new Command("remove <symbol>", "removes a cryptocurrency symbol from your watchlist") }
+                { Options.Remove, new Command("remove <symbol>", "removes a cryptocurrency symbol from your watchlist") },
                 // ...
             };
 
@@ -93,8 +93,7 @@ namespace AlgorithmicTrading {
                 service.TryDeposit(total);
             }
             else {
-                // TODO CHANGE
-                Console.WriteLine("Problem.");
+                Printer.ShowInvalidAmount();
             }
         }
 
@@ -116,7 +115,7 @@ namespace AlgorithmicTrading {
                     break;
                 }
             }
-            Printer.PrintCommandsCommon(inCommand, wasFound);
+            Printer.PrintCommandsCommon(inCommand, wasFound, this);
         }
 
         private void ProcessParamCommand(string[] tokens) {
@@ -130,15 +129,12 @@ namespace AlgorithmicTrading {
                     break;
                 }
             }
-            Printer.PrintCommandsCommon(
-                string.Join(" ", tokens), 
-                wasFound
-            );
+            Printer.PrintCommandsCommon(string.Join(" ", tokens), wasFound, this);
         }
 
         private bool ReadInputInternal(ThreadController controller, string line) {
             var lower = line.ToLower();
-            var tokens = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var tokens = lower.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (tokens.Length == 1
             && lower == enumMap[Options.Withdraw].Name) {
                 ProcessSimpleCommand(lower);
@@ -153,6 +149,7 @@ namespace AlgorithmicTrading {
             }
             else {
                 Printer.ShowUnknownAction(line);
+                ShowHelp();
             }
             return true;
         }
@@ -164,6 +161,7 @@ namespace AlgorithmicTrading {
                     continue;
                 }
                 Printer.ShowSeparator();
+                Printer.ShowTime();
                 if (!ReadInputInternal(controller, line)) {
                     break;
                 }

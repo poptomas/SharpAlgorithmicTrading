@@ -74,11 +74,12 @@ namespace AlgorithmicTrading {
 			Console.WriteLine(new string('-', lineLength));
 		}
 
-		internal static void PrintCommandsCommon(string inCommand, bool wasFound) {
+		internal static void PrintCommandsCommon(string inCommand, bool wasFound, InputProcessor proc) {
 			if(!wasFound) {
 				ShowUnknownAction(inCommand);
+				proc.ShowHelp();
 			}
-        }
+		}
 
 		internal static void ShowEstimatedWithdrawal(double estBalance, string currency, double fee) {
 			Console.WriteLine("Estimated withdrawal: {0:0.#####} {1} (after {2:P} fee)", estBalance, currency, fee);
@@ -96,11 +97,23 @@ namespace AlgorithmicTrading {
 			Console.Write("Add cryptocurrency symbols to your watchlist: ");
 		}
 
-		internal static void ShowCantSell(string symbol) {
-			Console.WriteLine("{0} cannot be sold - you do not possess any", symbol);
+        internal static void ShowWatchlistEmpty() {
+            Console.WriteLine("Your watchlist is empty");
+        }
+
+        internal static void ShowCantSell(string symbol, double price) {
+			Console.WriteLine("[SELL SIGNAL]: {0} (at price {1:0.#####} USD) cannot be sold - you do not possess any", symbol, price);
 		}
-		internal static void ShowCantBuy(string symbol) {
-			Console.WriteLine("{0} cannot be bought - deposit to increase funds", symbol);
+		internal static void ShowCantBuy(string symbol, double price) {
+			Console.WriteLine("[BUY SIGNAL]: {0} (at price {1:0.#####} USD) cannot be bought - deposit to increase funds", symbol, price);
 		}
-	}
+
+		internal static void ShowTime() {
+			Console.WriteLine(DateTime.Now);
+		}
+
+		internal static void ShowInvalidAmount() {
+			Console.WriteLine("Invalid amount");
+		}
+    }
 }
