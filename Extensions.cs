@@ -55,7 +55,7 @@ namespace AlgorithmicTrading {
         public static void Print(this SortedDictionary<string, double> assets) {
             Console.WriteLine("Assets:");
             foreach (var (symbol, amount) in assets) {
-                Console.WriteLine("[{0}: {1}]", symbol, amount);
+                Console.WriteLine("[{0}: {1:0.#####}]", symbol, amount);
             }
         }
     }
@@ -64,7 +64,8 @@ namespace AlgorithmicTrading {
         public static void Print(this SortedDictionary<string, Dictionary<string, double>> records) {
             Console.WriteLine("Indicators");
             foreach (var (symbol, indicators) in records) {
-                Console.WriteLine(" {0}", symbol);
+                Console.WriteLine(" {0}", 
+                    symbol);
                 foreach(var (name, value) in indicators) {
                     Console.WriteLine("     {0} : {1:0.#####}", name, value);
                 }

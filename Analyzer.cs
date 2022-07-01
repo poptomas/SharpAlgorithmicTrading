@@ -86,7 +86,7 @@ namespace AlgorithmicTrading {
         internal void Add(string inSymbol, List<double> inPreviousPrices) {
             lock (mutex) { // protect critical section from para linq threads
                 int iteration = 0;
-                dataset.Add(inSymbol, new Matrix());
+                dataset[inSymbol] = new Matrix();
                 int prevPricesCount = inPreviousPrices.Count;
                 foreach (double price in inPreviousPrices) {
                     Dictionary<string, double> rowRecords = new Dictionary<string, double>();
@@ -119,10 +119,12 @@ namespace AlgorithmicTrading {
                 { rsi.IndicatorName, rsiValue },
                 { bb.LIndicatorName, lowerBand },
                 { bb.UIndicatorName, upperBand },
-                { priceKey, price } 
+                { priceKey, price }
             };
 
-            lastRecords[symbol] = rowCells;
+            lock (lastRecords) {
+                lastRecords[symbol] = rowCells;
+            }
             return rowCells;
         }
 
@@ -142,7 +144,9 @@ namespace AlgorithmicTrading {
         }
 
         internal void ShowIndicators() {
-            lastRecords.Print();
+            lock (lastRecords) {
+                lastRecords.Print();
+            }
         }
 
         private void CreateTransaction(string symbol, double price, double cryptoAmount, State action) {
@@ -235,18 +239,20 @@ namespace AlgorithmicTrading {
         }
 
         internal void ProcessData(SortedDictionary<string, Cryptocurrency> data, bool shallAddRow) {
-            Stopwatch sw = new Stopwatch();
-            sw.Start();
+            //Stopwatch sw = new Stopwatch();
+            //sw.Start();
             foreach (var (symbol, cryptocurrency) in data) {
-                var newRow = GetNextRow(symbol, cryptocurrency.Price);
-                if (shallAddRow) {
-                    dataset[symbol].Dequeue();
-                    dataset[symbol].Enqueue(newRow);
+                if (dataset.ContainsKey(symbol)) {
+                    var newRow = GetNextRow(symbol, cryptocurrency.Price);
+                    if (shallAddRow) {
+                        dataset[symbol].Dequeue();
+                        dataset[symbol].Enqueue(newRow);
+                    }
+                    DecideSignal(symbol, newRow);
                 }
-                DecideSignal(symbol, newRow);
             }
-            sw.Stop();
-            sw.ShowMs();
+            //sw.Stop();
+            //sw.ShowMs();
         }
 
         internal void ShowDataset() {

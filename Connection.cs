@@ -173,7 +173,7 @@ namespace AlgorithmicTrading {
             List<double> result = new List<double>();
             try {
                 var response = await Client.GetStreamAsync(endpoint).ConfigureAwait(false);
-                Console.WriteLine("Request #{0} - Time: {1}", ++responseCounter, DateTime.Now);
+                //Console.WriteLine("Request #{0} - Time: {1}", ++responseCounter, DateTime.Now);
                 var storage = await JsonSerializer.DeserializeAsync<double[][]>(response, JsonOptions);
                 foreach (var arr in storage) {
                     result.Add(arr[closingPriceIndex]);
@@ -201,7 +201,7 @@ namespace AlgorithmicTrading {
             try {
                 string endpoint = GetCurrentDataEndpoint();
                 var response = await Client.GetStreamAsync(endpoint).ConfigureAwait(false);
-                Console.WriteLine("Request #{0} - Time: {1}", ++responseCounter, DateTime.Now);
+                //Console.WriteLine("Request #{0} - Time: {1}", ++responseCounter, DateTime.Now);
 
                 // binance api - a long list [ {"symbol" : "example", "price" : "0.0001"}, ..., {...} ]
                 var result = await JsonSerializer
@@ -217,7 +217,7 @@ namespace AlgorithmicTrading {
             );
 
             sw.Stop();
-            sw.ShowMs("ReceiveCurrentDataAsync()");
+            //sw.ShowMs("ReceiveCurrentDataAsync()");
         }
 
 
