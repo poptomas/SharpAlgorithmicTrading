@@ -32,7 +32,7 @@ namespace AlgorithmicTrading {
     static class WatchlistExtensions {
         public static void Print(this SortedDictionary<string, Cryptocurrency> watchList) {
             foreach (var (name, cryptocurrency) in watchList) {
-                Console.WriteLine("[{0}: {1}]", name, cryptocurrency.Price);
+                Console.WriteLine("[{0}: {1} USD]", name, cryptocurrency.Price);
             }
         }
     }
@@ -43,7 +43,7 @@ namespace AlgorithmicTrading {
                 Console.WriteLine("Cryptocurrency: {0}", symbol);
                 foreach (var dict in matrix) {
                     foreach (var (indicator, value) in dict) {
-                        Console.Write("{0:0.#####} ", indicator, value);
+                        Console.Write("{0}: {1:0.#####}", indicator, value);
                     }
                     Console.WriteLine();
                 }
