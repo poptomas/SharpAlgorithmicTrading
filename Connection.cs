@@ -1,8 +1,6 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 
-using System.Diagnostics;
-
 namespace AlgorithmicTrading {
     interface IConnection {
         public void ReceiveCurrentData();
@@ -10,7 +8,7 @@ namespace AlgorithmicTrading {
         public Dictionary<string, double> Cryptocurrencies { get; }
         public SortedDictionary<string, Cryptocurrency> Watchlist { get; }
         public DataAnalyzer Analyzer { get; }
-        public ServiceNumerics Numerics { get; }
+        public ServiceInfo ServiceInfo { get; }
     }
 
     sealed class Connection<Service> : IConnection
@@ -58,15 +56,15 @@ namespace AlgorithmicTrading {
             }
         }
 
-        public ServiceNumerics Numerics {
+        public ServiceInfo ServiceInfo {
             get {
-                return service.Numerics;
+                return service.ServiceInfo;
             }
         }
 
         private readonly Service service;
 
-        internal void TryRemove(string inCryptocurrency) {
+        public void TryRemove(string inCryptocurrency) {
             if (Watchlist.ContainsKey(inCryptocurrency)) {
                 Analyzer.Remove(inCryptocurrency);
                 Watchlist.Remove(inCryptocurrency);
@@ -77,9 +75,8 @@ namespace AlgorithmicTrading {
             }
         }
 
-        internal void TryAdd(string inCryptocurrency) {
-            if (Cryptocurrencies.ContainsKey(inCryptocurrency)
-            && !Watchlist.ContainsKey(inCryptocurrency)) {
+        public void TryAdd(string inCryptocurrency) {
+            if (IsValidInput(inCryptocurrency)) {
                 service.PrepareDatasets(new string[1] { inCryptocurrency });
                 var cryptocurrencyAction = new Cryptocurrency(
                     inAction: State.Default,
@@ -96,16 +93,16 @@ namespace AlgorithmicTrading {
             }
         }
 
-        internal void TryDeposit(double inDepositValue) {
-            if (inDepositValue < Numerics.MinimumDeposit) {
-                Printer.WarnMinDepositRequired(Numerics.MinimumDeposit);
+        public void TryDeposit(double inDepositValue) {
+            if (inDepositValue < ServiceInfo.MinimumDeposit) {
+                Printer.WarnMinDepositRequired(ServiceInfo.MinimumDeposit);
             }
             else {
                 Analyzer.Deposit(inDepositValue);
             }
         }
 
-        internal void CallMarket() {
+        public void CallMarket() {
             // accessible from connection
             if (Watchlist.Count == 0) {
                 Printer.DisplayWatchlistEmpty();
@@ -115,24 +112,30 @@ namespace AlgorithmicTrading {
             }
         }
 
-        internal void CallIndicators() {
+        public void CallIndicators() {
             Analyzer.ShowIndicators();
         }
 
-        internal void CallAssets() {
+        public void CallAssets() {
             Analyzer.ShowAssets(Watchlist);
         }
 
-        internal void CallWithdraw() {
+        public void CallWithdraw() {
             Analyzer.Withdraw(Watchlist);
         }
 
-        internal void CallTransactions() {
+        public void CallTransactions() {
             Analyzer.ShowTransactions();
+        }
+
+        private bool IsValidInput(string symbol) {
+            return symbol.Contains(ServiceInfo.Currency)
+                && Cryptocurrencies.ContainsKey(symbol)
+                && !Watchlist.ContainsKey(symbol);
         }
     }
 
-    sealed internal class BinanceConnection : IConnection {
+    sealed class BinanceConnection : IConnection {
         private struct BinanceAPICryptocurrencyInfo {
             public string Symbol { get; init; }
             public double Price { get; init; }
@@ -146,19 +149,20 @@ namespace AlgorithmicTrading {
                 NumberHandling = JsonNumberHandling.AllowReadingFromString
             };
             Cryptocurrencies = new Dictionary<string, double>();
-            Numerics = new ServiceNumerics(
+            ServiceInfo = new ServiceInfo(
                 inTradingFee: 0.001,
                 inDepositFee: 0.01,
                 inWithdrawalFee: 0.01,
-                inMinDeposit: 15
+                inMinDeposit: 15,
+                inCurrency: "USD"
             );
-            Analyzer = new DataAnalyzer(Numerics);
+            Analyzer = new DataAnalyzer(ServiceInfo);
             Watchlist = new SortedDictionary<string, Cryptocurrency>();
         }
         public Dictionary<string, double> Cryptocurrencies { get; private set; }
         public SortedDictionary<string, Cryptocurrency> Watchlist { get; private set; }
         public DataAnalyzer Analyzer { get; init; }
-        public ServiceNumerics Numerics { get; }
+        public ServiceInfo ServiceInfo { get; }
 
         public void ReceiveCurrentData() {
             if (firstTime) {
@@ -166,6 +170,7 @@ namespace AlgorithmicTrading {
                 firstTime = false;
             }
             else {
+                //ReceiveCurrentDataAsyncWithParallelism();
                 ReceiveCurrentDataAsync();
             }
         }
@@ -175,25 +180,18 @@ namespace AlgorithmicTrading {
                 Printer.WarnEmptyWatchlist();
             }
             var filteredSymbols = FilterSetPreferences(inSymbols);
-            try {
-                var query = filteredSymbols
-                    .AsParallel()
-                    .AsUnordered()
-                    // testing the difference -> .WithDegreeOfParallelism(2)
-                    .Select(symbol => {
-                        return (
-                            Symbol: symbol,
-                            Dataset: ReceiveDataset(symbol)
-                         );
-                    });
-                query.ForAll(part => {
-                    Analyzer.Add(part.Symbol, part.Dataset.Result);
+            var query = filteredSymbols
+                .AsParallel()
+                .AsUnordered()
+                .Select(symbol => {
+                    return (
+                        Symbol: symbol,
+                        Dataset: ReceiveDataset(symbol)
+                        );
                 });
-                //Analyzer.ShowDataset();
-            }
-            catch (Exception exc) {
-                Console.WriteLine(exc.Message);
-            }
+            query.ForAll(part => {
+                Analyzer.Add(part.Symbol, part.Dataset.Result);
+            });
         }
 
         private async Task<List<double>> ReceiveDataset(string name) {
@@ -204,7 +202,6 @@ namespace AlgorithmicTrading {
             try {
                 var response = await Client
                     .GetStreamAsync(endpoint);
-                //Console.WriteLine("Request #{0} - Time: {1}", ++responseCounter, DateTime.Now);
                 var storage = await JsonSerializer
                     .DeserializeAsync<double[][]>(response, JsonOptions);
                 foreach (var arr in storage) {
@@ -224,15 +221,48 @@ namespace AlgorithmicTrading {
             }
         }
 
+        private async Task<List<BinanceAPICryptocurrencyInfo>> Deserialize(Stream response) {
+            return await JsonSerializer
+                .DeserializeAsync<List<BinanceAPICryptocurrencyInfo>>(response, JsonOptions)
+                .ConfigureAwait(false);
+        }
+
+        private async Task<List<BinanceAPICryptocurrencyInfo>> GetJsonAsync(string endpoint, SemaphoreSlim sem) {
+            await sem.WaitAsync();
+            var response = await Client.GetStreamAsync(endpoint).ConfigureAwait(false);
+            var result = await Deserialize(response);
+            return result;
+        }
+
+        private async void ReceiveCurrentDataAsyncWithParallelism() {
+            int requestMultiplier = 4; // launches multiple requests and the fastest one is taken further
+                                       // Environment.ProcessorCount may cause way too many requests -> temporary suspension
+            string endpoint = GetCurrentDataEndpoint();
+            var urls = Enumerable.Range(1, requestMultiplier).Select(v => endpoint);
+            try {
+                // Deserialization of Binance API
+                // - a single long list, such as [ {"symbol" : "example", "price" : "0.0001"}, ..., {...} ]
+                var semaphore = new SemaphoreSlim(requestMultiplier);
+                var tasks = urls.Select(url => GetJsonAsync(url, semaphore));
+                var fastestTask = await Task.WhenAny(tasks);
+                FormWatchlist(fastestTask.Result);
+            }
+            catch (HttpRequestException) {
+                Printer.WarnConnectionLost(endpoint);
+            }
+            Analyzer.ProcessData(
+                data: Watchlist,
+                shallAddRow: false
+            );
+        }
+
         private async void ReceiveCurrentDataAsync() {
             string endpoint = GetCurrentDataEndpoint();
             try {
                 // Deserialization of Binance API
                 // - a single long list, such as [ {"symbol" : "example", "price" : "0.0001"}, ..., {...} ]
                 var response = await Client.GetStreamAsync(endpoint).ConfigureAwait(false);
-                var result = await JsonSerializer
-                    .DeserializeAsync<List<BinanceAPICryptocurrencyInfo>>(response, JsonOptions)
-                    .ConfigureAwait(false);
+                var result = await Deserialize(response);
                 FormWatchlist(result);
             }
             catch (HttpRequestException) {
@@ -244,7 +274,6 @@ namespace AlgorithmicTrading {
             );
         }
 
-
         private void ReceiveCurrentDataSync() {
             string endpoint = GetCurrentDataEndpoint();
             try {
@@ -255,7 +284,7 @@ namespace AlgorithmicTrading {
                 FormWatchlist(result);
             }
             catch (HttpRequestException) {
-                Printer.WarnConnectionLost(endpoint);
+                Printer.ErrorConnectionLost();
             }
             Analyzer.ProcessData(
                 data: Watchlist,
@@ -271,10 +300,15 @@ namespace AlgorithmicTrading {
             Watchlist[symbol] = cryptocurrency;
         }
 
+        private bool IsValidInput(string symbol) {
+            return symbol.Contains(ServiceInfo.Currency)
+                && Cryptocurrencies.ContainsKey(symbol)
+                && !Watchlist.ContainsKey(symbol);
+        }
+
         private IEnumerable<string> FilterSetPreferences(string[] inSymbols) {
             foreach (var symbol in inSymbols) {
-                if (Cryptocurrencies.ContainsKey(symbol)
-                && !Watchlist.ContainsKey(symbol)) {
+                if (IsValidInput(symbol)) {
                     AddNewCryptocurrency(symbol);
                     yield return symbol; // give the opportunity to process gradually
                 }
@@ -302,7 +336,7 @@ namespace AlgorithmicTrading {
         private JsonSerializerOptions JsonOptions { get; }
     }
 
-    sealed internal class DummyConnection : IConnection {
+    sealed class DummyConnection : IConnection {
         public DummyConnection() {
             // optionally if needed - initialize service connected numerics
             // trading fee, withdrawal fee, minimum deposit
@@ -318,6 +352,6 @@ namespace AlgorithmicTrading {
         public Dictionary<string, double> Cryptocurrencies { get; }
         public SortedDictionary<string, Cryptocurrency> Watchlist { get; }
         public DataAnalyzer Analyzer { get; }
-        public ServiceNumerics Numerics { get; }
+        public ServiceInfo ServiceInfo { get; }
     }
 }
