@@ -43,7 +43,7 @@ namespace AlgorithmicTrading {
                 Console.WriteLine("Cryptocurrency: {0}", symbol);
                 foreach (var dict in matrix) {
                     foreach (var (indicator, value) in dict) {
-                        Console.Write("{0}: {1:0.#####}", indicator, value);
+                        Console.Write("{0}: {1:0.#####} ", indicator, value);
                     }
                     Console.WriteLine();
                 }
@@ -53,7 +53,6 @@ namespace AlgorithmicTrading {
 
     static class AssetsExtensions {
         public static void Print(this SortedDictionary<string, double> assets) {
-            Console.WriteLine("Assets:");
             foreach (var (symbol, amount) in assets) {
                 Console.WriteLine("[{0}: {1:0.#####}]", symbol, amount);
             }
@@ -62,10 +61,8 @@ namespace AlgorithmicTrading {
 
     static class IndicatorsExtensions {
         public static void Print(this SortedDictionary<string, Dictionary<string, double>> records) {
-            Console.WriteLine("Indicators");
             foreach (var (symbol, indicators) in records) {
-                Console.WriteLine(" {0}", 
-                    symbol);
+                Console.WriteLine(" {0}", symbol);
                 foreach(var (name, value) in indicators) {
                     Console.WriteLine("     {0} : {1:0.#####}", name, value);
                 }
