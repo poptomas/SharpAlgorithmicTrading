@@ -1,7 +1,7 @@
 # Cryptocurrency Algorithmic Trading Bot
 
 ## Table of Contents
-- [ToTheMoon (Cryptocurrency Trading Bot)](#cryptocurrency-algorithmic-trading-bot)
+- [Cryptocurrency Algorithmic Trading Bot](#cryptocurrency-algorithmic-trading-bot)
   - [Table of Contents](#table-of-contents)
   - [Introduction](#introduction)
     - [Brief Description](#brief-description)
