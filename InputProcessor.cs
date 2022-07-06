@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace AlgorithmicTrading {
-    internal class InputProcessor {
+    class InputProcessor {
         enum Options { Add, Assets, Deposit, Help, Indicators, Market, Remove, Transactions, Withdraw };
         private readonly Dictionary<Options, Command> enumMap;
         private readonly Dictionary<Options, Action> simpleFuncMap;
