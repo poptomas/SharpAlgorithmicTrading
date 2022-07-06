@@ -16,7 +16,7 @@
 Cryptocurrency Algorithmic Trading Bot (CATB) is a console application written in C# which serves as a simulator for algorithmic trading with cryptocurrencies.
 Currently supported cryptocurrency exchange is [Binance](https://www.binance.com/). Within the application there is no real money involved.
 
-CATB supports various commands which are requested from the user via ```Console.ReadLine()```:
+CATB supports various commands which are requested from the user via ```Console.ReadLine()```, as shown below:
 ```
 ----------------------------------------
 Supported commands (case insensitive, without <>):
@@ -31,7 +31,9 @@ add <symbol> - ........ - adds a cryptocurrency symbol to your watchlist
 remove <symbol> - ..... - removes a cryptocurrency symbol from your watchlist
 ----------------------------------------
 ```
-- which is expected output of ```help``` command
+By the way, this is the expected output of ```help``` command.
+
+Disclaimer: in case anyone uses results produced by the CATB for their own financial decisions, the library author holds no responsibility for potential losses.
 
 ### Motivation
 The main motivation behind the simulator creation was to learn more about cryptocurrency in general
