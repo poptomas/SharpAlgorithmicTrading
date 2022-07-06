@@ -1,14 +1,12 @@
 # Cryptocurrency Algorithmic Trading Bot
 
 ## Table of Contents
-- [Cryptocurrency Algorithmic Trading Bot](#cryptocurrency-algorithmic-trading-bot)
-  - [Table of Contents](#table-of-contents)
-  - [Introduction](#introduction)
-    - [Brief Description](#brief-description)
-    - [Motivation](#motivation)
-  - [Technology Used](#technology-used)
-  - [Setup and Launch](#setup-and-launch)
-  - [Hardware Requirements](#hardware-requirements)
+- [Introduction](#introduction)
+- [Brief Description](#brief-description)
+- [Motivation](#motivation)
+- [Technology Used](#technology-used)
+- [Setup and Launch](#setup-and-launch)
+- [Hardware Requirements](#hardware-requirements)
 
 ## Introduction
 ### Brief Description
