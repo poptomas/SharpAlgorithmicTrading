@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace AlgorithmicTrading {
-    internal class FSHandler {
+    class FSHandler {
         private readonly string directory;
         private readonly string file;
         private TextWriter writer;
@@ -34,9 +34,9 @@ namespace AlgorithmicTrading {
 
         public void Save(string row) {
             try {
-                writer.WriteLine(row);
+                writer?.WriteLine(row);
             }
-            catch(IOException) {
+            catch (IOException) {
                 Printer.WarnFileOpen();
             }
         }
