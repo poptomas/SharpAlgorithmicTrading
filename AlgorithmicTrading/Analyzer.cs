@@ -89,14 +89,18 @@
                 double lastPrice = lastRecords[symbol][priceKey];
                 ProcessSellSignalInternal(symbol, lastPrice, wasForced: true);
             }
-            dataset.Remove(symbol);
-            Assets.Remove(symbol);
-            lastRecords.Remove(symbol);
+            lock (Assets) {
+                dataset.Remove(symbol);
+                Assets.Remove(symbol);
+                lastRecords.Remove(symbol);
+            }
         }
 
         public void ShowAssets(SortedDictionary<string, Cryptocurrency> inValues) {
             var value = GetWithdrawalValue(inValues);
-            Assets.Print();
+            lock (Assets) {
+                Assets.Print();
+            }
             Printer.DisplayEstimatedWithdrawal(value, ServiceInfo.Currency, ServiceInfo.WithdrawalFee);
         }
 
@@ -111,12 +115,16 @@
                 Printer.DisplayNoTransactionsYet();
             }
             else {
-                transactions.Print();
+                lock (transactions) {
+                    transactions.Print();
+                }
             }
         }
 
         public void ShowDataset() {
-            dataset.Print();
+            lock (dataset) {
+                dataset.Print();
+            }
         }
 
         public ServiceInfo ServiceInfo { get; init; }
@@ -155,10 +163,12 @@
 
         private void CreateTransaction(string symbol, double price, double cryptoAmount, State action) {
             var transaction = new Transaction(symbol, price, cryptoAmount, Enum.GetName(action));
-            if (transactions.Count >= maxTransactions) {
-                transactions.Dequeue();
+            lock (transactions) {
+                if (transactions.Count >= maxTransactions) {
+                    transactions.Dequeue();
+                }
+                transactions.Enqueue(transaction);
             }
-            transactions.Enqueue(transaction);
             var line = transaction.GetCSVLine();
             fsHandler.Save(line);
         }
@@ -173,8 +183,10 @@
             double cryptoAmount = Assets[symbol];
             double cryptoInFiat = cryptoAmount * price;
             double afterTradingFee = cryptoInFiat - cryptoInFiat * ServiceInfo.TradingFee;
-            Assets[symbol] = 0;
-            Assets[ServiceInfo.Currency] += afterTradingFee;
+            lock (Assets) {
+                Assets[symbol] = 0;
+                Assets[ServiceInfo.Currency] += afterTradingFee;
+            }
             signalCounterMap[symbol] = 0; // start over for another signal to come
             CreateTransaction(symbol, price, cryptoAmount, State.Sell);
         }
@@ -201,8 +213,10 @@
             double investedValue = Assets[currency] / investmentSplit;
             double afterTradingFee = investedValue - investedValue * ServiceInfo.TradingFee;
             double cryptoAmount = afterTradingFee / price;
-            Assets[currency] -= investedValue;
-            Assets[symbol] += cryptoAmount;
+            lock (Assets) {
+                Assets[currency] -= investedValue;
+                Assets[symbol] += cryptoAmount;
+            }
             signalCounterMap[symbol] = 0; // start over for another signal to come
             CreateTransaction(symbol, price, cryptoAmount, State.Buy);
         }

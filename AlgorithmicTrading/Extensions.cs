@@ -31,7 +31,7 @@ namespace AlgorithmicTrading {
 
     static class WatchlistExtensions {
         public static void Print(this SortedDictionary<string, Cryptocurrency> watchList) {
-            foreach (var (name, cryptocurrency) in watchList) {
+            foreach (var (name, cryptocurrency) in watchList.ToList()) {
                 Console.WriteLine("[{0}: {1} USD]", name, cryptocurrency.Price);
             }
         }

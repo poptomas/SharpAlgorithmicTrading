@@ -66,8 +66,10 @@ namespace AlgorithmicTrading {
 
         public void TryRemove(string inCryptocurrency) {
             if (Watchlist.ContainsKey(inCryptocurrency)) {
-                Analyzer.Remove(inCryptocurrency);
-                Watchlist.Remove(inCryptocurrency);
+                lock (Watchlist) {
+                    Analyzer.Remove(inCryptocurrency);
+                    Watchlist.Remove(inCryptocurrency);
+                }
                 Printer.DisplayRemovedSuccess(inCryptocurrency);
             }
             else {
@@ -82,7 +84,9 @@ namespace AlgorithmicTrading {
                     inAction: State.Default,
                     inPrice: Cryptocurrencies[inCryptocurrency]
                 );
-                Watchlist[inCryptocurrency] = cryptocurrencyAction;
+                lock (Watchlist) {
+                    Watchlist[inCryptocurrency] = cryptocurrencyAction;
+                }
                 Printer.DisplayAddedSuccess(inCryptocurrency);
             }
             else if(Watchlist.ContainsKey(inCryptocurrency)) {
@@ -216,8 +220,10 @@ namespace AlgorithmicTrading {
 
         private void FormWatchlist(List<BinanceAPICryptocurrencyInfo> parsedValues) {
             Cryptocurrencies = parsedValues.ToDictionary(member => member.Symbol, member => member.Price);
-            foreach (var (symbol, info) in Watchlist.ToList()) {
-                Watchlist[symbol] = new Cryptocurrency(info.Action, Cryptocurrencies[symbol]);
+            lock (Watchlist) {
+                foreach (var (symbol, info) in Watchlist.ToList()) {
+                    Watchlist[symbol] = new Cryptocurrency(info.Action, Cryptocurrencies[symbol]);
+                }
             }
         }
 
