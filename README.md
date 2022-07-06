@@ -33,7 +33,7 @@ remove <symbol> - ..... - removes a cryptocurrency symbol from your watchlist
 ```
 By the way, this is the expected output of ```help``` command.
 
-Disclaimer: in case anyone uses results produced by the CATB for their own financial decisions, the library author holds no responsibility for potential losses.
+Disclaimer: in case anyone uses results produced by the CATB for their own financial decisions, the author of the project holds no responsibility for potential losses.
 
 ### Motivation
 The main motivation behind the simulator creation was to learn more about cryptocurrency in general
