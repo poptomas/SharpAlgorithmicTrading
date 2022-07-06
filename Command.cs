@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace AlgorithmicTrading {
-    internal struct Command {
+    struct Command {
         public Command(string inName, string inDescription) {
             Name = inName;
             Description = inDescription;
