@@ -2,20 +2,12 @@
     using DataMap = Dictionary<string, Queue<Dictionary<string, double>>>;
     using Matrix = Queue<Dictionary<string, double>>;
 
-    internal interface IAnalyzer {
-        public SortedDictionary<string, double> Assets { get; }
-    }
-
-    internal struct TechnicalIndicatorsAnalyzer : IAnalyzer {
-        public ServiceNumerics Numerics { get; init; }
-
-        public SortedDictionary<string, double> Assets { get; private set; }
-
-        public TechnicalIndicatorsAnalyzer(ServiceNumerics inNumerics) {
+    struct TechnicalIndicatorsAnalyzer {
+        public TechnicalIndicatorsAnalyzer(ServiceInfo inInfo) {
             dataset = new DataMap();
             lastRecords = new SortedDictionary<string, Dictionary<string, double>>();
-            Assets = new SortedDictionary<string, double>() { { currency, 0 } };
-            Numerics = inNumerics;
+            ServiceInfo = inInfo;
+            Assets = new SortedDictionary<string, double>() { { ServiceInfo.Currency, 0 } };
             // indicators
             signalCounterMap = new Dictionary<string, int>();
             bb = new BollingerBands();
@@ -29,7 +21,7 @@
         }
 
         public void ProcessData(SortedDictionary<string, Cryptocurrency> data, bool shallAddRow) {
-            foreach (var (symbol, cryptocurrency) in data) {
+            foreach (var (symbol, cryptocurrency) in data.ToList()) {
                 if (dataset.ContainsKey(symbol)) {
                     var newRow = GetNextRow(symbol, cryptocurrency.Price);
                     if (shallAddRow) {
@@ -43,6 +35,8 @@
 
         public void Withdraw(SortedDictionary<string, Cryptocurrency> inValues) {
             double withdrawalVal = GetWithdrawalValue(inValues);
+            string currency = ServiceInfo.Currency;
+            double fee = ServiceInfo.WithdrawalFee;
             foreach (var (symbol, cryptocurrency) in inValues) {
                 if (Assets[symbol] > 0) {
                     ProcessSellSignalInternal(symbol, cryptocurrency.Price, wasForced: true);
@@ -50,13 +44,14 @@
                 }
             }
             Assets[currency] = 0;
-            Printer.DisplayTotalBalance(withdrawalVal, currency, Numerics.WithdrawalFee);
+            Printer.DisplayTotalBalance(withdrawalVal, currency, fee);
         }
 
         public void Deposit(double depositValue) {
-            double afterFee = depositValue - depositValue * Numerics.DepositFee;
+            string currency = ServiceInfo.Currency;
+            double afterFee = depositValue - depositValue * ServiceInfo.DepositFee;
             Assets[currency] += afterFee;
-            Printer.DisplayDepositSuccess(afterFee, Numerics.DepositFee, Assets[currency]);
+            Printer.DisplayDepositSuccess(afterFee, ServiceInfo.DepositFee, Assets[currency]);
         }
 
         public void Add(string inSymbol, List<double> inPreviousPrices) {
@@ -65,7 +60,7 @@
                 dataset[inSymbol] = new Matrix();
                 int prevPricesCount = inPreviousPrices.Count;
                 foreach (double price in inPreviousPrices) {
-                    Dictionary<string, double> rowRecords = new Dictionary<string, double>();
+                    var rowRecords = new Dictionary<string, double>();
 
                     foreach (var member in indicators) {
                         member.FillCells(ref rowRecords, iteration, dataset[inSymbol], price);
@@ -79,7 +74,9 @@
                     dataset[inSymbol].Enqueue(rowRecords);
                     ++iteration;
                     if (iteration == prevPricesCount) {
-                        lastRecords[inSymbol] = rowRecords;
+                        lock (lastRecords) {
+                            lastRecords[inSymbol] = rowRecords;
+                        }
                     }
                 }
                 Assets[inSymbol] = 0;
@@ -100,7 +97,7 @@
         public void ShowAssets(SortedDictionary<string, Cryptocurrency> inValues) {
             var value = GetWithdrawalValue(inValues);
             Assets.Print();
-            Printer.DisplayEstimatedWithdrawal(value, currency, Numerics.WithdrawalFee);
+            Printer.DisplayEstimatedWithdrawal(value, ServiceInfo.Currency, ServiceInfo.WithdrawalFee);
         }
 
         public void ShowIndicators() {
@@ -122,7 +119,11 @@
             dataset.Print();
         }
 
+        public ServiceInfo ServiceInfo { get; init; }
+        public SortedDictionary<string, double> Assets { get; private set; }
+
         private double GetWithdrawalValue(SortedDictionary<string, Cryptocurrency> inValues) {
+            string currency = ServiceInfo.Currency;
             double withdrawValue = Assets[currency];
             foreach (var (symbol, amount) in Assets) {
                 if (symbol != currency) {
@@ -131,7 +132,7 @@
                     withdrawValue += value;
                 }
             }
-            double withdrawalAfterFee = withdrawValue - withdrawValue * Numerics.WithdrawalFee;
+            double withdrawalAfterFee = withdrawValue - withdrawValue * ServiceInfo.WithdrawalFee;
             return withdrawalAfterFee;
         }
 
@@ -171,9 +172,9 @@
             }
             double cryptoAmount = Assets[symbol];
             double cryptoInFiat = cryptoAmount * price;
-            double afterTradingFee = cryptoInFiat - cryptoInFiat * Numerics.TradingFee;
+            double afterTradingFee = cryptoInFiat - cryptoInFiat * ServiceInfo.TradingFee;
             Assets[symbol] = 0;
-            Assets[currency] += afterTradingFee;
+            Assets[ServiceInfo.Currency] += afterTradingFee;
             signalCounterMap[symbol] = 0; // start over for another signal to come
             CreateTransaction(symbol, price, cryptoAmount, State.Sell);
         }
@@ -189,16 +190,16 @@
                 signalCounterMap[symbol] = 0;
             }
             else {
-                // TODO - remove later
                 // "preparing for the signal"
-                //Console.WriteLine("Prepare for the [SELL] signal with {0} ({1}x)", symbol, signalCounterMap[symbol]);
+                // Console.WriteLine("Prepare for the [SELL] signal with {0} ({1}x)", symbol, signalCounterMap[symbol]);
             }
         }
 
         private void BuySignalInternal(string symbol, double price) {
             Printer.ShowBuySignal(symbol, price);
+            string currency = ServiceInfo.Currency;
             double investedValue = Assets[currency] / investmentSplit;
-            double afterTradingFee = investedValue - investedValue * Numerics.TradingFee;
+            double afterTradingFee = investedValue - investedValue * ServiceInfo.TradingFee;
             double cryptoAmount = afterTradingFee / price;
             Assets[currency] -= investedValue;
             Assets[symbol] += cryptoAmount;
@@ -208,8 +209,7 @@
 
         private void ProcessBuySignal(string symbol, double price) {
             ++signalCounterMap[symbol];
-
-            var currencyAmount = Assets[currency];
+            var currencyAmount = Assets[ServiceInfo.Currency];
             if (currencyAmount > 1 && signalCounterMap[symbol] >= signalThreshold) {
                 // it could be (and probably is) different across multiple cryptocurrency exchanges
                 // to ensure that the bot is not just working with infinitely low amounts
@@ -221,9 +221,7 @@
             }
             else {
                 // "preparing for the signal"
-                // TODO - remove later - spamming
-
-                //Console.WriteLine("Prepare for the [BUY] signal with {0} ({1}x)", symbol, signalCounterMap[symbol]);
+                // Console.WriteLine("Prepare for the [BUY] signal with {0} ({1}x)", symbol, signalCounterMap[symbol]);
             }
         }
 
@@ -231,7 +229,6 @@
             State bbSignal = bb.GetDecision(newRow);
             State rsiSignal = rsi.GetDecision(newRow);
             double closePrice = newRow[priceKey];
-
             if (bbSignal == State.Buy && rsiSignal == State.Buy) {
                 ProcessBuySignal(symbol, closePrice);
             }
@@ -243,7 +240,6 @@
             }
         }
 
-        private const string currency = "USD";
         private const string priceKey = "price";
         private const int maxTransactions = 20; // do not keep all transactions in memory
                                                 // - just a queue of all couple of them, the full history will be stored in a file
@@ -261,7 +257,7 @@
         private Dictionary<string, int> signalCounterMap;
         private object mutex = new object();
 
-        public interface IIndicator {
+        interface IIndicator {
             public int LookBackPeriod { get; init; }
 
             public State GetDecision(Dictionary<string, double> row);
@@ -273,7 +269,7 @@
             public string LIndicatorName { get; init; }
             public string UIndicatorName { get; init; }
             public BollingerBands() {
-                LookBackPeriod = 20; // 21 including the latest price
+                LookBackPeriod = 21;
                 LIndicatorName = "Lower band";
                 UIndicatorName = "Upper band";
             }
@@ -327,12 +323,6 @@
                 variance = Math.Sqrt(variance / prices.Count);
                 return variance;
             }
-
-
-
-
-
-
         }
 
         private struct RelativeStrengthIndex : IIndicator {
@@ -341,7 +331,7 @@
             private readonly int buySignalPercentage;
             public string IndicatorName { get; init; }
             public RelativeStrengthIndex() {
-                LookBackPeriod = 13; // 14 including the latest price
+                LookBackPeriod = 14;
                 sellSignalPercentage = 70;
                 buySignalPercentage = 30;
                 IndicatorName = "RSI";
