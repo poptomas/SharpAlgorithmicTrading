@@ -3,14 +3,14 @@ global using Service = AlgorithmicTrading.BinanceConnection; // CoinbaseConnecti
 global using DataAnalyzer = AlgorithmicTrading.TechnicalIndicatorsAnalyzer;
 
 namespace AlgorithmicTrading {
-    internal struct Entrypoint {
+    struct Entrypoint {
         private readonly TimeSpan delay;
 
         public Entrypoint() {
             delay = TimeSpan.FromSeconds(1);
         }
 
-        internal void Run() {
+        public void Run() {
             var conn = new Connection<Service>();
             InputProcessor proc = new InputProcessor(conn);
             string[] userInput = proc.Process();
@@ -42,12 +42,11 @@ namespace AlgorithmicTrading {
                     conn.UpdateDataset();
                     currentTime = updatedTime;
                 }
-                controller.Release();
             }
         }
     }
 
-    internal class Program {
+    class Program {
         static void Main(string[] args) {
             var entrypoint = new Entrypoint();
             entrypoint.Run();
