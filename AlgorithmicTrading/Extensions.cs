@@ -14,12 +14,25 @@ namespace AlgorithmicTrading {
         }
     }
 
+    static class ConcurrentDictionaryExtensions {
+        public static void Increment<T>(this ConcurrentDictionary<T, int> dictionary, T key) {
+            dictionary.AddOrUpdate(key, 1, (key, count) => count + 1);
+        }
+
+        public static void Add<T>(this ConcurrentDictionary<T, double> dictionary, T key, double amount) {
+            dictionary.AddOrUpdate(key, amount, (key, count) => count + amount);
+        }
+
+        public static void Subtract<T>(this ConcurrentDictionary<T, double> dictionary, T key, double amount) {
+            dictionary.AddOrUpdate(key, amount, (key, count) => count - amount);
+        }
+    }
+
     static class StringExtensions {
         public static string Filter(this string input, char removedCharacter) {
             return string.Join("", input.Split(removedCharacter));
         }
     }
-
    
     static class StopwatchExtensions {
         public static void ShowMs(this Stopwatch stopwatch) {

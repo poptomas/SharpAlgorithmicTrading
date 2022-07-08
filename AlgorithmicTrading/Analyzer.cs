@@ -12,7 +12,7 @@ namespace AlgorithmicTrading {
             Assets = new ConcurrentDictionary<string, double>();
             Assets[ServiceInfo.Currency] = 0;
             // indicators
-            signalCounterMap = new Dictionary<string, int>();
+            signalCounterMap = new ConcurrentDictionary<string, int>();
             bb = new BollingerBands();
             rsi = new RelativeStrengthIndex();
             indicators = new List<IIndicator>() { bb, rsi };
@@ -52,7 +52,7 @@ namespace AlgorithmicTrading {
         public void Deposit(double depositValue) {
             string currency = ServiceInfo.Currency;
             double afterFee = depositValue - depositValue * ServiceInfo.DepositFee;
-            Assets[currency] += afterFee;
+            Assets.Add(currency, afterFee);
             Printer.DisplayDepositSuccess(afterFee, ServiceInfo.DepositFee, Assets[currency]);
         }
 
@@ -170,13 +170,13 @@ namespace AlgorithmicTrading {
             double cryptoInFiat = cryptoAmount * price;
             double afterTradingFee = cryptoInFiat - cryptoInFiat * ServiceInfo.TradingFee;
             Assets[symbol] = 0;
-            Assets[ServiceInfo.Currency] += afterTradingFee;
+            Assets.Add(ServiceInfo.Currency, afterTradingFee);
             signalCounterMap[symbol] = 0; // start over for another signal to come
             CreateTransaction(symbol, price, cryptoAmount, State.Sell);
         }
 
         private void ProcessSellSignal(string symbol, double price) {
-            ++signalCounterMap[symbol];
+            signalCounterMap.Increment(symbol);
             var cryptoAmount = Assets[symbol];
             if (cryptoAmount > 0 && signalCounterMap[symbol] >= signalThreshold) {
                 ProcessSellSignalInternal(symbol, price, wasForced: false);
@@ -197,8 +197,8 @@ namespace AlgorithmicTrading {
             double investedValue = Assets[currency] / investmentSplit;
             double afterTradingFee = investedValue - investedValue * ServiceInfo.TradingFee;
             double cryptoAmount = afterTradingFee / price;
-            Assets[currency] -= investedValue;
-            Assets[symbol] += cryptoAmount;
+            Assets.Subtract(currency, investedValue);
+            Assets.Add(symbol, cryptoAmount);
             signalCounterMap[symbol] = 0; // start over for another signal to come
             CreateTransaction(symbol, price, cryptoAmount, State.Buy);
         }
@@ -250,7 +250,7 @@ namespace AlgorithmicTrading {
         private readonly RelativeStrengthIndex rsi;
         private List<IIndicator> indicators;
         private ConcurrentDictionary<string, Dictionary<string, double>> lastRecords;
-        private Dictionary<string, int> signalCounterMap;
+        private ConcurrentDictionary<string, int> signalCounterMap;
         private object mutex = new object();
 
         interface IIndicator {
