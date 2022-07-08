@@ -1,13 +1,16 @@
-﻿namespace AlgorithmicTrading {
-    using DataMap = Dictionary<string, Queue<Dictionary<string, double>>>;
+﻿using System.Collections.Concurrent;
+
+namespace AlgorithmicTrading {
+    using DataMap = ConcurrentDictionary<string, Queue<Dictionary<string, double>>>;
     using Matrix = Queue<Dictionary<string, double>>;
 
     struct TechnicalIndicatorsAnalyzer {
         public TechnicalIndicatorsAnalyzer(ServiceInfo inInfo) {
             dataset = new DataMap();
-            lastRecords = new SortedDictionary<string, Dictionary<string, double>>();
+            lastRecords = new ConcurrentDictionary<string, Dictionary<string, double>>();
             ServiceInfo = inInfo;
-            Assets = new SortedDictionary<string, double>() { { ServiceInfo.Currency, 0 } };
+            Assets = new ConcurrentDictionary<string, double>();
+            Assets[ServiceInfo.Currency] = 0;
             // indicators
             signalCounterMap = new Dictionary<string, int>();
             bb = new BollingerBands();
@@ -15,13 +18,12 @@
             indicators = new List<IIndicator>() { bb, rsi };
             maxLookback = indicators.Select(c => c.LookBackPeriod).Max();
             // transactions
-            transactions = new Queue<Transaction>();
-            fsHandler = new FSHandler("results.csv");
-            fsHandler.TryFlushPreviousRun();
+            transactions = new ConcurrentQueue<Transaction>();
+            fsHandler = new FSHandler("transactions/results.csv");
         }
 
-        public void ProcessData(SortedDictionary<string, Cryptocurrency> data, bool shallAddRow) {
-            foreach (var (symbol, cryptocurrency) in data.ToList()) {
+        public void ProcessData(ConcurrentDictionary<string, Cryptocurrency> data, bool shallAddRow) {
+            foreach (var (symbol, cryptocurrency) in data.OrderBy(member => member.Key)) {
                 if (dataset.ContainsKey(symbol)) {
                     var newRow = GetNextRow(symbol, cryptocurrency.Price);
                     if (shallAddRow) {
@@ -33,7 +35,7 @@
             }
         }
 
-        public void Withdraw(SortedDictionary<string, Cryptocurrency> inValues) {
+        public void Withdraw(ConcurrentDictionary<string, Cryptocurrency> inValues) {
             double withdrawalVal = GetWithdrawalValue(inValues);
             string currency = ServiceInfo.Currency;
             double fee = ServiceInfo.WithdrawalFee;
@@ -74,9 +76,7 @@
                     dataset[inSymbol].Enqueue(rowRecords);
                     ++iteration;
                     if (iteration == prevPricesCount) {
-                        lock (lastRecords) {
-                            lastRecords[inSymbol] = rowRecords;
-                        }
+                        lastRecords[inSymbol] = rowRecords;
                     }
                 }
                 Assets[inSymbol] = 0;
@@ -89,25 +89,19 @@
                 double lastPrice = lastRecords[symbol][priceKey];
                 ProcessSellSignalInternal(symbol, lastPrice, wasForced: true);
             }
-            lock (Assets) {
-                dataset.Remove(symbol);
-                Assets.Remove(symbol);
-                lastRecords.Remove(symbol);
-            }
+            dataset.TryRemove(symbol, out _);
+            Assets.TryRemove(symbol, out _);
+            lastRecords.TryRemove(symbol, out _);
         }
 
-        public void ShowAssets(SortedDictionary<string, Cryptocurrency> inValues) {
+        public void ShowAssets(ConcurrentDictionary<string, Cryptocurrency> inValues) {
             var value = GetWithdrawalValue(inValues);
-            lock (Assets) {
-                Assets.Print();
-            }
+            Assets.Print();
             Printer.DisplayEstimatedWithdrawal(value, ServiceInfo.Currency, ServiceInfo.WithdrawalFee);
         }
 
         public void ShowIndicators() {
-            lock (lastRecords) {
-                lastRecords.Print();
-            }
+            lastRecords.Print();
         }
 
         public void ShowTransactions() {
@@ -115,22 +109,18 @@
                 Printer.DisplayNoTransactionsYet();
             }
             else {
-                lock (transactions) {
-                    transactions.Print();
-                }
+                transactions.Print();
             }
         }
 
         public void ShowDataset() {
-            lock (dataset) {
-                dataset.Print();
-            }
+            dataset.Print();
         }
 
         public ServiceInfo ServiceInfo { get; init; }
-        public SortedDictionary<string, double> Assets { get; private set; }
+        public ConcurrentDictionary<string, double> Assets { get; private set; }
 
-        private double GetWithdrawalValue(SortedDictionary<string, Cryptocurrency> inValues) {
+        private double GetWithdrawalValue(ConcurrentDictionary<string, Cryptocurrency> inValues) {
             string currency = ServiceInfo.Currency;
             double withdrawValue = Assets[currency];
             foreach (var (symbol, amount) in Assets) {
@@ -155,21 +145,17 @@
                 { priceKey, price }
             };
 
-            lock (lastRecords) {
-                lastRecords[symbol] = rowCells;
-            }
+            lastRecords[symbol] = rowCells;
             return rowCells;
         }
 
         private void CreateTransaction(string symbol, double price, double cryptoAmount, State action) {
             var transaction = new Transaction(symbol, price, cryptoAmount, Enum.GetName(action));
-            lock (transactions) {
-                if (transactions.Count >= maxTransactions) {
-                    transactions.Dequeue();
-                }
-                transactions.Enqueue(transaction);
-            }
             var line = transaction.GetCSVLine();
+            if (transactions.Count >= maxTransactions) {
+                transactions.TryDequeue(out _);
+            }
+            transactions.Enqueue(transaction);
             fsHandler.Save(line);
         }
 
@@ -183,10 +169,8 @@
             double cryptoAmount = Assets[symbol];
             double cryptoInFiat = cryptoAmount * price;
             double afterTradingFee = cryptoInFiat - cryptoInFiat * ServiceInfo.TradingFee;
-            lock (Assets) {
-                Assets[symbol] = 0;
-                Assets[ServiceInfo.Currency] += afterTradingFee;
-            }
+            Assets[symbol] = 0;
+            Assets[ServiceInfo.Currency] += afterTradingFee;
             signalCounterMap[symbol] = 0; // start over for another signal to come
             CreateTransaction(symbol, price, cryptoAmount, State.Sell);
         }
@@ -213,10 +197,8 @@
             double investedValue = Assets[currency] / investmentSplit;
             double afterTradingFee = investedValue - investedValue * ServiceInfo.TradingFee;
             double cryptoAmount = afterTradingFee / price;
-            lock (Assets) {
-                Assets[currency] -= investedValue;
-                Assets[symbol] += cryptoAmount;
-            }
+            Assets[currency] -= investedValue;
+            Assets[symbol] += cryptoAmount;
             signalCounterMap[symbol] = 0; // start over for another signal to come
             CreateTransaction(symbol, price, cryptoAmount, State.Buy);
         }
@@ -263,11 +245,11 @@
 
         private FSHandler fsHandler;
         private DataMap dataset;
-        private Queue<Transaction> transactions;
+        private ConcurrentQueue<Transaction> transactions;
         private readonly BollingerBands bb;
         private readonly RelativeStrengthIndex rsi;
         private List<IIndicator> indicators;
-        private SortedDictionary<string, Dictionary<string, double>> lastRecords;
+        private ConcurrentDictionary<string, Dictionary<string, double>> lastRecords;
         private Dictionary<string, int> signalCounterMap;
         private object mutex = new object();
 
@@ -303,7 +285,7 @@
                 }
             }
 
-            public void FillCells(ref Dictionary<string, double> rowCells, 
+            public void FillCells(ref Dictionary<string, double> rowCells,
                 int iteration, Matrix matrix, double price) {
                 if (iteration > LookBackPeriod) {
                     var (lower, upper) = GetBands(matrix, price);

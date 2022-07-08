@@ -1,12 +1,13 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Collections.Concurrent;
 
 namespace AlgorithmicTrading {
     interface IConnection {
         public void ReceiveCurrentData();
         public void PrepareDatasets(string[] input);
         public Dictionary<string, double> Cryptocurrencies { get; }
-        public SortedDictionary<string, Cryptocurrency> Watchlist { get; }
+        public ConcurrentDictionary<string, Cryptocurrency> Watchlist { get; }
         public DataAnalyzer Analyzer { get; }
         public ServiceInfo ServiceInfo { get; }
     }
@@ -38,7 +39,7 @@ namespace AlgorithmicTrading {
             }
         }
 
-        public SortedDictionary<string, Cryptocurrency> Watchlist {
+        public ConcurrentDictionary<string, Cryptocurrency> Watchlist {
             get {
                 return service.Watchlist;
             }
@@ -66,10 +67,8 @@ namespace AlgorithmicTrading {
 
         public void TryRemove(string inCryptocurrency) {
             if (Watchlist.ContainsKey(inCryptocurrency)) {
-                lock (Watchlist) {
-                    Analyzer.Remove(inCryptocurrency);
-                    Watchlist.Remove(inCryptocurrency);
-                }
+                Analyzer.Remove(inCryptocurrency);
+                Watchlist.Remove(inCryptocurrency, out _);
                 Printer.DisplayRemovedSuccess(inCryptocurrency);
             }
             else {
@@ -84,9 +83,7 @@ namespace AlgorithmicTrading {
                     inAction: State.Default,
                     inPrice: Cryptocurrencies[inCryptocurrency]
                 );
-                lock (Watchlist) {
-                    Watchlist[inCryptocurrency] = cryptocurrencyAction;
-                }
+                Watchlist[inCryptocurrency] = cryptocurrencyAction;
                 Printer.DisplayAddedSuccess(inCryptocurrency);
             }
             else if(Watchlist.ContainsKey(inCryptocurrency)) {
@@ -161,10 +158,10 @@ namespace AlgorithmicTrading {
                 inCurrency: "USD"
             );
             Analyzer = new DataAnalyzer(ServiceInfo);
-            Watchlist = new SortedDictionary<string, Cryptocurrency>();
+            Watchlist = new ConcurrentDictionary<string, Cryptocurrency>();
         }
         public Dictionary<string, double> Cryptocurrencies { get; private set; }
-        public SortedDictionary<string, Cryptocurrency> Watchlist { get; private set; }
+        public ConcurrentDictionary<string, Cryptocurrency> Watchlist { get; private set; }
         public DataAnalyzer Analyzer { get; init; }
         public ServiceInfo ServiceInfo { get; }
 
@@ -356,7 +353,7 @@ namespace AlgorithmicTrading {
             throw new NotImplementedException();
         }
         public Dictionary<string, double> Cryptocurrencies { get; }
-        public SortedDictionary<string, Cryptocurrency> Watchlist { get; }
+        public ConcurrentDictionary<string, Cryptocurrency> Watchlist { get; }
         public DataAnalyzer Analyzer { get; }
         public ServiceInfo ServiceInfo { get; }
     }
