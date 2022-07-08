@@ -9,32 +9,28 @@ namespace AlgorithmicTrading {
     class FSHandler {
         private readonly string directory;
         private readonly string file;
-        private TextWriter writer;
 
         public FSHandler(string path) {
             directory = Path.GetDirectoryName(path);
-            file = Path.GetFileName(path);
-        }
-
-        public void TryFlushPreviousRun() {
+            file = Path.GetFullPath(path);
             try {
-                if(Directory.Exists(directory)) {
+                if (!Directory.Exists(directory)) {
                     Directory.CreateDirectory(directory);
                 }
-                else if(File.Exists(file)) {
+                else if (File.Exists(file)) {
                     File.Delete(file);
                 }
-                writer = new StreamWriter(file);
+                using StreamWriter writer = new StreamWriter(file);
             }
-            catch(IOException) {
+            catch (IOException) {
                 Printer.WarnFileOpen();
             }
-            
         }
 
         public void Save(string row) {
             try {
-                writer?.WriteLine(row);
+                using StreamWriter writer = File.AppendText(file);
+                writer.WriteLine(row);
             }
             catch (IOException) {
                 Printer.WarnFileOpen();
