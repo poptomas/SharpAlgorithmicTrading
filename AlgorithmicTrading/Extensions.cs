@@ -1,6 +1,8 @@
 ﻿using System.Diagnostics;
+using System.Collections.Concurrent;
+
 namespace AlgorithmicTrading {
-    using DataMap = Dictionary<string, Queue<Dictionary<string, double>>>;
+    using DataMap = ConcurrentDictionary<string, Queue<Dictionary<string, double>>>;
 
     static class IEnumerableExtensions {
         public static IEnumerable<double> GetDifferences(this IEnumerable<double> storage) {
@@ -30,8 +32,8 @@ namespace AlgorithmicTrading {
     }
 
     static class WatchlistExtensions {
-        public static void Print(this SortedDictionary<string, Cryptocurrency> watchList) {
-            foreach (var (name, cryptocurrency) in watchList.ToList()) {
+        public static void Print(this ConcurrentDictionary<string, Cryptocurrency> watchList) {
+            foreach (var (name, cryptocurrency) in watchList.OrderBy(member => member.Key)) {
                 Console.WriteLine("[{0}: {1} USD]", name, cryptocurrency.Price);
             }
         }
@@ -52,16 +54,16 @@ namespace AlgorithmicTrading {
     }
 
     static class AssetsExtensions {
-        public static void Print(this SortedDictionary<string, double> assets) {
-            foreach (var (symbol, amount) in assets) {
+        public static void Print(this ConcurrentDictionary<string, double> assets) {
+            foreach (var (symbol, amount) in assets.OrderBy(member => member.Key)) {
                 Console.WriteLine("[{0}: {1:0.#####}]", symbol, amount);
             }
         }
     }
 
     static class IndicatorsExtensions {
-        public static void Print(this SortedDictionary<string, Dictionary<string, double>> records) {
-            foreach (var (symbol, indicators) in records) {
+        public static void Print(this ConcurrentDictionary<string, Dictionary<string, double>> records) {
+            foreach (var (symbol, indicators) in records.OrderBy(member => member.Key)) {
                 Console.WriteLine(" {0}", symbol);
                 foreach(var (name, value) in indicators) {
                     Console.WriteLine("     {0} : {1:0.#####}", name, value);
@@ -71,8 +73,9 @@ namespace AlgorithmicTrading {
     }
 
     static class TransactionExtensions {
-        public static void Print(this Queue<Transaction> records) {
+        public static void Print(this ConcurrentQueue<Transaction> records) {
             int lineNum = 1;
+
             foreach (var item in records) {
                 Console.WriteLine("{0}. {1}", lineNum, item);
                 ++lineNum;
