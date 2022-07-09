@@ -217,10 +217,8 @@ namespace AlgorithmicTrading {
 
         private void FormWatchlist(List<BinanceAPICryptocurrencyInfo> parsedValues) {
             Cryptocurrencies = parsedValues.ToDictionary(member => member.Symbol, member => member.Price);
-            lock (Watchlist) {
-                foreach (var (symbol, info) in Watchlist.ToList()) {
-                    Watchlist[symbol] = new Cryptocurrency(info.Action, Cryptocurrencies[symbol]);
-                }
+            foreach (var (symbol, info) in Watchlist.ToList()) {
+                Watchlist[symbol] = new Cryptocurrency(info.Action, Cryptocurrencies[symbol]);
             }
         }
 
