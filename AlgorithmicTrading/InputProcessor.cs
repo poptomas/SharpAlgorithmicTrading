@@ -50,45 +50,45 @@ namespace AlgorithmicTrading {
             delimiter = ' ';
         }
 
-        internal string[] Process() {
+        public string[] Process() {
             Printer.DisplayHeader();
             return ProcessCinArguments();
         }
 
-        internal void ShowInitialHelp() {
+        public void ShowInitialHelp() {
             Printer.DisplaySeparator();
             ShowHelp();
             Printer.DisplaySeparator();
         }
 
-        internal void ShowHelp() {
+        public void ShowHelp() {
             Printer.DisplayHelpHeader();
             foreach(var (option, command) in enumMap) {
                 Console.WriteLine(command.GetLine());
             }
         }
 
-        internal void CallTransactions() {
+        public void CallTransactions() {
             service.CallTransactions();
         }
 
-        internal void CallIndicators() {
+        public void CallIndicators() {
             service.CallIndicators();
         }
 
-        internal void CallAsssets() {
+        public void CallAsssets() {
             service.CallAssets();
         }
 
-        internal void CallMarket() {
+        public void CallMarket() {
             service.CallMarket();
         }
 
-        internal void CallWithdraw() {
+        public void CallWithdraw() {
             service.CallWithdraw();
         }
 
-        internal void TryDeposit(string amount) {
+        public void TryDeposit(string amount) {
             if(double.TryParse(amount, out double total) && total > 0) {
                 service.TryDeposit(total);
             }
@@ -97,11 +97,11 @@ namespace AlgorithmicTrading {
             }
         }
 
-        internal void TryAdd(string inCryptocurrency) {
+        public void TryAdd(string inCryptocurrency) {
             service.TryAdd(inCryptocurrency);
         }
 
-        internal void TryRemove(string inCryptocurrency) {
+        public void TryRemove(string inCryptocurrency) {
             service.TryRemove(inCryptocurrency);
         }
 
@@ -132,7 +132,7 @@ namespace AlgorithmicTrading {
             Printer.PrintCommandsCommon(string.Join(" ", tokens), wasFound, this);
         }
 
-        private bool ReadInputInternal(ThreadController controller, string line) {
+        private bool ReadInputpublic(ThreadController controller, string line) {
             var lower = line.ToLower();
             var tokens = lower.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (tokens.Length == 1
@@ -154,7 +154,7 @@ namespace AlgorithmicTrading {
             return true;
         }
 
-        internal void ReadInput(ThreadController controller) {
+        public void ReadInput(ThreadController controller) {
             while (true) {
                 var line = Console.ReadLine();
                 if (string.IsNullOrEmpty(line)) {
@@ -162,7 +162,7 @@ namespace AlgorithmicTrading {
                 }
                 Printer.DisplaySeparator();
                 Printer.DisplayTime();
-                if (!ReadInputInternal(controller, line)) {
+                if (!ReadInputpublic(controller, line)) {
                     break;
                 }
                 Printer.DisplaySeparator();

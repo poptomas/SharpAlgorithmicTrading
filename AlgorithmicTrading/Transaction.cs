@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace AlgorithmicTrading {
-    internal struct Transaction {
+    struct Transaction {
         public Transaction(string inSymbol, double inAmount, double inExchangeRate, string inAction) {
             timestamp = DateTime.Now;
             symbol = inSymbol;
