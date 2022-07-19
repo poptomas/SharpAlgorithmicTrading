@@ -132,7 +132,7 @@ namespace AlgorithmicTrading {
             Printer.PrintCommandsCommon(string.Join(" ", tokens), wasFound, this);
         }
 
-        private bool ReadInputpublic(ThreadController controller, string line) {
+        private bool ReadInputInternal(ThreadController controller, string line) {
             var lower = line.ToLower();
             var tokens = lower.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (tokens.Length == 1
@@ -162,7 +162,7 @@ namespace AlgorithmicTrading {
                 }
                 Printer.DisplaySeparator();
                 Printer.DisplayTime();
-                if (!ReadInputpublic(controller, line)) {
+                if (!ReadInputInternal(controller, line)) {
                     break;
                 }
                 Printer.DisplaySeparator();

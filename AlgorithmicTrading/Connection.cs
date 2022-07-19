@@ -188,8 +188,9 @@ namespace AlgorithmicTrading {
                     return (
                         Symbol: symbol,
                         Dataset: ReceiveDataset(symbol)
-                        );
+                    );
                 });
+
             query.ForAll(part => {
                 Analyzer.Add(part.Symbol, part.Dataset.Result);
             });
